@@ -106,6 +106,9 @@ describe('idempotent writes', () => {
 })
 
 describe('outage -> queue -> consumer', () => {
+  // Longer than the consumer's 20 s long poll, so the poll that receives the message starts
+  // before the outage and returns during it, whatever the timing.
+  const OUTAGE_MS = 22_000
   const draftId = `D-it-${randomUUID().slice(0, 8)}`
   const conversationId = `c-it-${randomUUID().slice(0, 8)}`
 
@@ -115,7 +118,8 @@ describe('outage -> queue -> consumer', () => {
   })
 
   it('answers 503 during an outage, then a queued write is applied once it ends', async () => {
-    const chaos = await fetch(`${env.TICKETS_URL}/_chaos/outage?ms=8000`, { method: 'POST' })
+    const outageEndsAt = Date.now() + OUTAGE_MS
+    const chaos = await fetch(`${env.TICKETS_URL}/_chaos/outage?ms=${OUTAGE_MS}`, { method: 'POST' })
     expect(chaos.status).toBe(200)
     expect((await ticketsFetchRaw('/tickets', ana.accessToken)).status).toBe(503)
 
@@ -142,10 +146,15 @@ describe('outage -> queue -> consumer', () => {
     }
     await sqs.send(
       new SendMessageCommand({
-        QueueUrl: await queueUrl('ticket-writes'),
+        QueueUrl: await queueUrl(env.SQS_TICKET_WRITES_QUEUE),
         MessageBody: JSON.stringify(message),
       }),
     )
+
+    // The consumer is mid long poll when the outage starts: it gets the message but must hand it
+    // back, so nothing is written until the outage ends.
+    await new Promise((r) => setTimeout(r, outageEndsAt - Date.now() - 1500))
+    expect(await tickets().findOne({ idempotencyKey: draftId })).toBeNull()
 
     // Consumer (tickets) creates the ticket, then the web consumer finishes the draft.
     const ticket = await waitUntil(() => tickets().findOne({ idempotencyKey: draftId }), 40_000)
@@ -165,5 +174,5 @@ describe('outage -> queue -> consumer', () => {
     expect(await tickets().countDocuments({ idempotencyKey: draftId })).toBe(1)
 
     await waitForNoOutage()
-  })
+  }, 90_000)
 })

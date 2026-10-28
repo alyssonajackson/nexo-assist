@@ -14,6 +14,8 @@ const defaults = {
   MONGODB_URI: 'mongodb://localhost:27017/?directConnection=true',
   TICKETS_URL: 'http://localhost:4000',
   WEB_URL: 'http://localhost:3000',
+  /** The tickets service's write queue; override it to point the suite at another tickets server. */
+  SQS_TICKET_WRITES_QUEUE: 'ticket-writes',
   SEED_PASSWORD: 'nexo123',
   /** Set to 1 to run tests that restart containers of the shared stack (CI does). */
   INTEGRATION_RESTARTS: '0',
