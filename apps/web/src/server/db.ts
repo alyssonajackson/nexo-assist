@@ -17,6 +17,8 @@ export type ConversationDoc = Omit<Conversation, 'id'> & { _id: string }
 export type MessageDoc = Omit<Message, 'id'> & { _id: string }
 export type DraftDoc = Omit<Draft, 'id'> & { _id: string }
 export type CounterDoc = { _id: string; seq: number }
+/** A fixed-window usage counter (rate limits, LLM caps). Dropped by a TTL index when the window ends. */
+export type UsageDoc = { _id: string; count: number; expiresAt: Date }
 
 export type AssistDb = {
   client: MongoClient
@@ -25,6 +27,8 @@ export type AssistDb = {
   messages: Collection<MessageDoc>
   drafts: Collection<DraftDoc>
   counters: Collection<CounterDoc>
+  llmUsage: Collection<UsageDoc>
+  rateLimits: Collection<UsageDoc>
 }
 
 // One client per process; kept on globalThis so dev hot reloads do not open new pools.
@@ -50,6 +54,8 @@ async function connect(): Promise<AssistDb> {
     messages: db.collection<MessageDoc>(c.messages),
     drafts: db.collection<DraftDoc>(c.drafts),
     counters: db.collection<CounterDoc>(c.counters),
+    llmUsage: db.collection<UsageDoc>(c.llmUsage),
+    rateLimits: db.collection<UsageDoc>(c.rateLimits),
   }
   await Promise.all([
     assist.users.createIndex({ email: 1 }, { unique: true }),
@@ -58,6 +64,8 @@ async function connect(): Promise<AssistDb> {
     assist.conversations.createIndex({ employeeId: 1, lastMessageAt: -1 }),
     assist.messages.createIndex({ conversationId: 1, createdAt: 1 }),
     assist.drafts.createIndex({ conversationId: 1, status: 1 }),
+    assist.llmUsage.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    assist.rateLimits.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
   ])
   return assist
 }

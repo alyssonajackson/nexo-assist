@@ -7,6 +7,7 @@ import {
   type Conversation,
   type Transfer,
 } from '@nexo/shared'
+import { limits, type RefusalCode } from '../limits'
 import type { Session } from '../session'
 import {
   addRelatedTickets,
@@ -23,7 +24,7 @@ import { assistAgent, llmModelId, ticketsAs, type Emit } from './runtime'
 
 export class ChatError extends Error {
   constructor(
-    readonly code: 'not_found' | 'message_limit' | 'closed',
+    readonly code: 'not_found' | 'message_limit' | 'closed' | RefusalCode,
     message: string,
   ) {
     super(message)
@@ -53,10 +54,22 @@ async function resolveConversation(session: Session, conversationId?: string): P
  * During a handoff the message is stored for the analyst and the agent stays silent.
  */
 export async function sendMessage(session: Session, req: ChatRequest, emit: Emit): Promise<void> {
+  const userId = session.user.userId
   const conv = await resolveConversation(session, req.conversationId)
   if (conv.state === 'closed')
     throw new ChatError('closed', 'Esta conversa foi encerrada. Comece uma nova conversa.')
-  const counted = await countEmployeeMessage(conv.id, session.user.userId)
+
+  // LLM caps, checked before anything is stored: a refused message stays in the composer.
+  // Messages during a handoff never reach the model, so they are not counted.
+  const reserved = conv.state === 'agent'
+  if (reserved) {
+    const refusal = await limits().reserveAgentTurn(userId)
+    if (refusal) throw new ChatError(refusal.code, refusal.message)
+  }
+
+  const counted = await countEmployeeMessage(conv.id, userId)
+  // Refused by the message limit, or handed off meanwhile: the reserved turn was not used.
+  if (reserved && counted?.state !== 'agent') await limits().releaseAgentTurn(userId)
   if (!counted) {
     throw new ChatError(
       'message_limit',
@@ -68,7 +81,7 @@ export async function sendMessage(session: Session, req: ChatRequest, emit: Emit
   const employeeMessage = await appendMessage({
     conversationId: conv.id,
     role: 'employee',
-    authorId: session.user.userId,
+    authorId: userId,
     text: req.text,
     parts: [],
   })
@@ -97,7 +110,7 @@ export async function sendMessage(session: Session, req: ChatRequest, emit: Emit
   const result = await runTurn({
     agent: assistAgent(),
     modelId: llmModelId(),
-    user: { id: session.user.userId, name: session.profile.name },
+    user: { id: userId, name: session.profile.name },
     conversationId: conv.id,
     history,
     text: req.text,

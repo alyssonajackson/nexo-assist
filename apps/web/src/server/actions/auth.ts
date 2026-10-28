@@ -1,6 +1,6 @@
 'use server'
 
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { isInvalidCredentialsError } from '@nexo/shared'
@@ -8,6 +8,7 @@ import type { LoginState } from '@/lib/auth-types'
 import { authProvider } from '../auth-provider'
 import { clearSessionCookies, writeSessionCookies } from '../cookies'
 import { env } from '../env'
+import { clientIp, limits } from '../limits'
 import { HOME_BY_ROLE } from '../session'
 
 const LoginForm = z.object({
@@ -21,6 +22,9 @@ export async function signIn(_prev: LoginState, formData: FormData): Promise<Log
   const email = String(formData.get('email') ?? '')
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Dados inválidos.', email }
 
+  const refusal = await limits().loginAttempt(clientIp(await headers()), parsed.data.email)
+  if (refusal) return { error: refusal.message, email }
+
   let home: string
   try {
     const auth = await authProvider()
@@ -33,7 +37,10 @@ export async function signIn(_prev: LoginState, formData: FormData): Promise<Log
     })
     home = HOME_BY_ROLE[user.role]
   } catch (err) {
-    if (isInvalidCredentialsError(err)) return { error: 'E-mail ou senha inválidos.', email }
+    if (isInvalidCredentialsError(err)) {
+      await limits().loginFailed(parsed.data.email)
+      return { error: 'E-mail ou senha inválidos.', email }
+    }
     console.error('login failed', err)
     return { error: 'Não foi possível entrar agora. Tente novamente em instantes.', email }
   }
