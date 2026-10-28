@@ -13,7 +13,9 @@ const config: NextConfig = {
   output: 'standalone',
   outputFileTracingRoot: path.join(import.meta.dirname, '../..'),
   // Workspace packages are shipped as TypeScript source.
-  transpilePackages: ['@nexo/shared'],
+  transpilePackages: ['@nexo/shared', '@nexo/agent'],
+  // Mastra is a Node library with its own dynamic imports: load it from node_modules, do not bundle it.
+  serverExternalPackages: ['@mastra/core'],
   // Keep dev screenshots identical to production and the repo free of generated agent files.
   devIndicators: false,
   agentRules: false,

@@ -8,6 +8,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps/web/package.json apps/web/
 COPY services/tickets/package.json services/tickets/
 COPY packages/shared/package.json packages/shared/
+COPY packages/agent/package.json packages/agent/
 COPY scripts/package.json scripts/
 RUN pnpm install --frozen-lockfile --filter "@nexo/web..."
 

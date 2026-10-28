@@ -35,6 +35,12 @@ importers:
 
   apps/web:
     dependencies:
+      '@mastra/core':
+        specifier: ^1.80.0
+        version: 1.80.0(ai@7.0.156(zod@4.6.7))(zod@4.6.7)
+      '@nexo/agent':
+        specifier: workspace:*
+        version: link:../../packages/agent
       '@nexo/shared':
         specifier: workspace:*
         version: link:../../packages/shared
