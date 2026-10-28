@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:evals": "RUN_LLM_EVALS=1 vitest run --project agent",
     "test:integration": "pnpm --filter @nexo/tests test:integration",
     "smoke": "./scripts/smoke.sh",
     "init:local": "pnpm --filter @nexo/scripts init:local",

@@ -20,3 +20,5 @@ coverage/
 next-env.d.ts
 *.tsbuildinfo
 .gstack/
+.evals/
+packages/agent/.scratch/
