@@ -1,0 +1,7 @@
+# gitleaks config: default rules, plus paths that are never committed anyway.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "local-only folders and emulator dummy credentials"
+paths = ['''node_modules''', '''\.next''', '''_specs''', '''_temp''', '''\.beads/.*\.db''']
