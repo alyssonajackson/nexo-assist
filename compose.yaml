@@ -63,7 +63,7 @@ services:
     env_file: [{ path: .env, required: false }]
     environment:
       <<: *aws-local
-      PORT: 4000
+      TICKETS_PORT: 4000
     depends_on:
       init: { condition: service_completed_successfully }
     healthcheck:
