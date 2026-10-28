@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "init:local": "tsx src/init.ts",
-    "seed:reset": "tsx src/init.ts --reset",
+    "init:local": "tsx --env-file-if-exists=../.env src/init.ts",
+    "seed:reset": "tsx --env-file-if-exists=../.env src/init.ts --reset",
     "typecheck": "tsc -p tsconfig.json",
-    "token": "tsx src/dev-token.ts"
+    "token": "tsx --env-file-if-exists=../.env src/dev-token.ts"
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.1158.0",
