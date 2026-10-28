@@ -9,8 +9,9 @@ export default defineConfig({
   // The tests share the seeded users' data: one at a time, in file order.
   workers: 1,
   fullyParallel: false,
-  // One retry absorbs the tickets service's simulated outages (FLAKY_ENABLED), which are random.
-  retries: 1,
+  // No retries: run the stack with FLAKY_ENABLED=false (as CI does), so the tickets service has no
+  // random outages. Outages are covered deterministically by the chaos-endpoint integration tests.
+  retries: 0,
   timeout: 60_000,
   expect: { timeout: 15_000 },
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
@@ -18,7 +19,7 @@ export default defineConfig({
   globalTeardown: './e2e/global-teardown.ts',
   use: {
     baseURL,
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
     viewport: { width: 1440, height: 900 },
     locale: 'pt-BR',
   },
