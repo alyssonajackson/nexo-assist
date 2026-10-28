@@ -1,4 +1,5 @@
 import {
+  TOOL_FAILED_LABELS,
   TOOL_LABELS,
   type Draft,
   type PriorityResult,
@@ -58,7 +59,7 @@ export class TurnRecorder {
       return result
     } catch (err) {
       const summary = err instanceof Error ? err.message : 'falhou'
-      this.push({ tool, label: TOOL_LABELS[tool], ok: false, ms: Date.now() - started, summary })
+      this.push({ tool, label: TOOL_FAILED_LABELS[tool], ok: false, ms: Date.now() - started, summary })
       throw err
     }
   }

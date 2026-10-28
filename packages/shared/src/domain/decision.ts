@@ -97,6 +97,18 @@ export const TOOL_LABELS: Record<ToolName, string> = {
   transfer_to_analyst: 'transferiu para um analista',
 }
 
+/** Chip label when the call failed or was refused (not found, duplicate, ticket system down...). */
+export const TOOL_FAILED_LABELS: Record<ToolName, string> = {
+  search_kb: 'tentou consultar a central de ajuda',
+  list_my_tickets: 'tentou consultar seus chamados',
+  get_ticket: 'tentou abrir o chamado',
+  classify_priority: 'tentou classificar a prioridade',
+  propose_draft: 'tentou montar um rascunho',
+  propose_update: 'tentou montar uma atualização',
+  propose_reopen: 'tentou montar uma reabertura',
+  transfer_to_analyst: 'tentou transferir para um analista',
+}
+
 /** One real tool call, recorded by code (never claimed by the model). */
 export const ToolCall = z.object({
   tool: z.string(),
