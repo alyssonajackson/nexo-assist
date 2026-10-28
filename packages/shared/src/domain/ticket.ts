@@ -37,7 +37,14 @@ export const AFFECTED_LABELS: Record<Affected, string> = {
   unknown: 'Não informado',
 }
 
-export const TicketStatus = z.enum(['open', 'in_progress', 'awaiting_analyst', 'approved', 'resolved', 'closed'])
+export const TicketStatus = z.enum([
+  'open',
+  'in_progress',
+  'awaiting_analyst',
+  'approved',
+  'resolved',
+  'closed',
+])
 export type TicketStatus = z.infer<typeof TicketStatus>
 
 export const STATUS_LABELS: Record<TicketStatus, string> = {

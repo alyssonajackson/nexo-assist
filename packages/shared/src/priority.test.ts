@@ -9,7 +9,8 @@ describe('derivePriority', () => {
   })
   it('critical when down for the whole company', () => {
     expect(
-      derivePriority({ type: 'INC', affected: 'company', blocksWork: true, sameDayCommitment: false }).priority,
+      derivePriority({ type: 'INC', affected: 'company', blocksWork: true, sameDayCommitment: false })
+        .priority,
     ).toBe('critical')
   })
   it('high when one person has a same-day commitment (VPN before the 14h meeting)', () => {
