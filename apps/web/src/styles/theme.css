@@ -1,4 +1,4 @@
-/* Design tokens extracted from the prototype exports. Tailwind v4 CSS-first config. */
+/* Design tokens extracted from the prototype exports (see docs/design-system.md). Tailwind v4 CSS-first config. */
 @theme {
   /* Fonts: set --font-sans / --font-serif vars via next/font (Schibsted Grotesk, Newsreader). */
   --font-sans: var(--font-schibsted), 'Schibsted Grotesk', system-ui, sans-serif;

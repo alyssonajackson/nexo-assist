@@ -1,6 +1,6 @@
 # Design notes
 
-Source: pen.dev exports. Tokens live in `theme.css`. Layout is 1440x900 desktop; sidebar 231px, analyst rail 64px.
+Source: pen.dev exports. Tokens live in `apps/web/src/styles/theme.css`. Layout is 1440x900 desktop; sidebar 231px, analyst rail 64px.
 
 ## Fonts (next/font/google)
 
