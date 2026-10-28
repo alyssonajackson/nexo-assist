@@ -20,8 +20,8 @@ export default async function setup() {
   const failures = (
     await Promise.all([
       check(`mongo (${env.MONGODB_URI})`, async () => (await connectMongo()).close()),
-      check(`cognito-local (${env.COGNITO_ENDPOINT})`, cognitoConfig),
-      check(`ElasticMQ (${env.SQS_ENDPOINT})`, () => sqs.send(new ListQueuesCommand({}))),
+      check(`Floci Cognito (${env.COGNITO_ENDPOINT})`, cognitoConfig),
+      check(`Floci SQS (${env.SQS_ENDPOINT})`, () => sqs.send(new ListQueuesCommand({}))),
     ])
   ).filter((f): f is string => f !== undefined)
 
