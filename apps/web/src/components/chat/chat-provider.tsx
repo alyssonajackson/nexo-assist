@@ -28,11 +28,14 @@ export function ChatProvider({
   const chat = useChat(initial)
   const composerRef = useRef<HTMLTextAreaElement>(null)
   const [editingDraftId, setEditingDraftId] = useState<string>()
+  // Editing ends by itself once the draft is no longer pending (confirmed, cancelled, replaced).
+  const editing =
+    editingDraftId && chat.state.drafts[editingDraftId]?.status === 'pending' ? editingDraftId : undefined
   const value: ChatContextValue = {
     ...chat,
     firstName,
     composerRef,
-    editingDraftId,
+    editingDraftId: editing,
     editDraft: (draftId) => {
       setEditingDraftId(draftId)
       composerRef.current?.focus()
