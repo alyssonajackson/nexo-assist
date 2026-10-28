@@ -4,7 +4,7 @@ import type { AssistAgent } from './agent'
 import { TURN_KEY, type AgentPorts, type AgentUser, type TurnContext } from './context'
 import { toModelMessages } from './history'
 import { AgentOutput, repairOutput, toModelDecision } from './output'
-import { applyPolicy, type TransferPlan } from './policy'
+import { applyPolicy, ticketsToShow, type TransferPlan } from './policy'
 import { TurnRecorder, type TurnEffects } from './recorder'
 
 /** Streamed to the chat while the turn runs. */
@@ -99,6 +99,9 @@ export async function runTurn(input: TurnInput): Promise<TurnResult> {
     effects: recorder.effects,
     employeeName: input.user.name,
     employeeMessage: input.text,
+    overdueOffered: input.history.some((m) =>
+      m.decision?.ruleOverrides.some((o) => o.rule === 'overdue_offer'),
+    ),
   })
 
   // Execute what the rules decided.
@@ -107,6 +110,7 @@ export async function runTurn(input: TurnInput): Promise<TurnResult> {
   if (policy.transfer && (await input.ports.handoff.transfer(input.conversationId, policy.transfer))) {
     transfer = policy.transfer
   }
+  if (policy.reopen) await proposeReopenByRule(input, recorder, policy.reopen)
   if (policy.reply !== model.reply) emit({ type: 'reply_replaced', text: policy.reply })
 
   const cancelled = new Set(policy.cancelDraftIds)
@@ -128,7 +132,12 @@ export async function runTurn(input: TurnInput): Promise<TurnResult> {
   return {
     reply: policy.reply,
     decision,
-    parts: buildParts(recorder.effects, cancelled, transfer ? undefined : decision.quickReplies),
+    parts: buildParts(
+      recorder.effects,
+      ticketsToShow(policy.decision, policy.reply, recorder.effects),
+      cancelled,
+      transfer ? undefined : decision.quickReplies,
+    ),
     ...(transfer ? { transfer } : {}),
   }
 }
@@ -184,6 +193,27 @@ async function streamModel(
   }
 }
 
+/** The reopen draft that policy.ts decided on, through the recorder so it shows as a real chip. */
+async function proposeReopenByRule(
+  input: TurnInput,
+  recorder: TurnRecorder,
+  { ticketId, reason }: { ticketId: string; reason: string },
+): Promise<void> {
+  const draft = await recorder.record(
+    'propose_reopen',
+    () =>
+      input.ports.drafts.propose({
+        conversationId: input.conversationId,
+        employeeId: input.user.id,
+        kind: 'reopen',
+        ticketId,
+        note: reason,
+      }),
+    (d) => `${d.id}: reabrir ${ticketId} (regra do código)`,
+  )
+  recorder.effects.drafts.push(draft)
+}
+
 /** The model's raw text, which Mastra attaches to a structured-output validation error. */
 function rawOutput(err: unknown): string {
   if (typeof err !== 'object' || err === null || !('details' in err)) return ''
@@ -198,13 +228,14 @@ function rawOutput(err: unknown): string {
 
 function buildParts(
   fx: TurnEffects,
+  ticketIds: string[],
   cancelled: Set<string>,
   quickReplies: string[] | undefined,
 ): MessagePart[] {
   const parts: MessagePart[] = []
-  const [first] = fx.shownTicketIds
+  const [first] = ticketIds
   if (fx.shownAs === 'single' && first) parts.push({ type: 'ticket', ticketId: first })
-  else if (fx.shownTicketIds.length) parts.push({ type: 'ticket_list', ticketIds: fx.shownTicketIds })
+  else if (ticketIds.length) parts.push({ type: 'ticket_list', ticketIds })
   const draft = fx.drafts.filter((d) => !cancelled.has(d.id)).at(-1)
   if (draft) parts.push({ type: 'draft', draftId: draft.id })
   if (quickReplies?.length) parts.push({ type: 'quick_replies', options: quickReplies.slice(0, 4) })

@@ -1,4 +1,5 @@
 import {
+  ChangeMessageVisibilityCommand,
   DeleteMessageCommand,
   GetQueueUrlCommand,
   ReceiveMessageCommand,
@@ -64,6 +65,11 @@ export class SqsEventQueue<T> implements EventQueue<T> {
           { abortSignal: signal },
         )
         for (const msg of res.Messages ?? []) {
+          // An outage can start during the 20 s long poll: hand the message back instead of handling it.
+          if (paused?.()) {
+            await this.release(msg.ReceiptHandle)
+            continue
+          }
           try {
             const parsed = this.schema.parse(JSON.parse(msg.Body ?? 'null'))
             await handler(parsed)
@@ -80,6 +86,22 @@ export class SqsEventQueue<T> implements EventQueue<T> {
         this.log(`[${this.queueName}] receive failed, retrying in 2s`, err)
         await sleep(2000, signal)
       }
+    }
+  }
+
+  /** Makes a received message visible again right away; the paused loop takes it after the outage. */
+  private async release(receiptHandle: string | undefined): Promise<void> {
+    try {
+      await this.client.send(
+        new ChangeMessageVisibilityCommand({
+          QueueUrl: await this.url(),
+          ReceiptHandle: receiptHandle,
+          VisibilityTimeout: 0,
+        }),
+      )
+    } catch (err) {
+      // Not fatal: the message comes back anyway when its visibility timeout expires.
+      this.log(`[${this.queueName}] could not release a message`, err)
     }
   }
 }

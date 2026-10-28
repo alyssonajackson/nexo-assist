@@ -82,6 +82,38 @@ describe('privacy (enforced inside the tickets service)', () => {
   })
 })
 
+// The scores behind MIN_DUPLICATE_SCORE (4) in the tickets service, measured on the seed data:
+// a different problem that shares a word or two scores 1-3, the same problem in other words 4.6-10.
+describe('duplicate candidates', () => {
+  const candidates = async (text: string) => {
+    const res = await ticketsFetch(`/tickets/duplicates?${new URLSearchParams({ text })}`, ana.accessToken)
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { candidates: { ticket: Ticket; score: number }[] }
+    return body.candidates.map((c) => c.ticket.id)
+  }
+
+  it.each([
+    // Same problem: 9.3, 4.65 (short), 7.6, 9.95.
+    ['Notebook muito lento Meu notebook continua muito lento depois da atualização do Windows.', 'INC-20311'],
+    ['Notebook lento O notebook está lento.', 'INC-20311'],
+    ['Senha do SAP bloqueada A senha do SAP bloqueou de novo e não consigo entrar.', 'INC-20150'],
+    ['Sem acesso à pasta do SharePoint Continuo sem acesso à pasta Financeiro no SharePoint.', 'INC-20298'],
+  ])('finds the open or recently resolved ticket for the same problem: %s', async (text, id) => {
+    expect((await candidates(text))[0]).toBe(id)
+  })
+
+  it.each([
+    // Only "Windows" / "desde" in common with "Notebook lento após atualização do Windows": 2.85.
+    'VPN com erro 809 no Windows 11 Não consigo conectar na VPN, aparece o erro 809 desde ontem à noite.',
+    // 1.05 against the notebook ticket.
+    'Impressora não imprime A impressora do 3º andar não imprime desde hoje de manhã, já reiniciei.',
+    // No shared words with the monitor request REQ-10442.
+    'Sistema de vendas fora do ar O sistema de vendas caiu para toda a equipe comercial.',
+  ])('does not offer an unrelated ticket as a duplicate: %s', async (text) => {
+    expect(await candidates(text)).toEqual([])
+  })
+})
+
 describe('idempotent writes', () => {
   it('replays the same ticket for the same Idempotency-Key', async () => {
     const key = `it-${randomUUID()}`
@@ -106,6 +138,9 @@ describe('idempotent writes', () => {
 })
 
 describe('outage -> queue -> consumer', () => {
+  // Longer than the consumer's 20 s long poll, so the poll that receives the message starts
+  // before the outage and returns during it, whatever the timing.
+  const OUTAGE_MS = 22_000
   const draftId = `D-it-${randomUUID().slice(0, 8)}`
   const conversationId = `c-it-${randomUUID().slice(0, 8)}`
 
@@ -115,7 +150,8 @@ describe('outage -> queue -> consumer', () => {
   })
 
   it('answers 503 during an outage, then a queued write is applied once it ends', async () => {
-    const chaos = await fetch(`${env.TICKETS_URL}/_chaos/outage?ms=8000`, { method: 'POST' })
+    const outageEndsAt = Date.now() + OUTAGE_MS
+    const chaos = await fetch(`${env.TICKETS_URL}/_chaos/outage?ms=${OUTAGE_MS}`, { method: 'POST' })
     expect(chaos.status).toBe(200)
     expect((await ticketsFetchRaw('/tickets', ana.accessToken)).status).toBe(503)
 
@@ -142,10 +178,15 @@ describe('outage -> queue -> consumer', () => {
     }
     await sqs.send(
       new SendMessageCommand({
-        QueueUrl: await queueUrl('ticket-writes'),
+        QueueUrl: await queueUrl(env.SQS_TICKET_WRITES_QUEUE),
         MessageBody: JSON.stringify(message),
       }),
     )
+
+    // The consumer is mid long poll when the outage starts: it gets the message but must hand it
+    // back, so nothing is written until the outage ends.
+    await new Promise((r) => setTimeout(r, outageEndsAt - Date.now() - 1500))
+    expect(await tickets().findOne({ idempotencyKey: draftId })).toBeNull()
 
     // Consumer (tickets) creates the ticket, then the web consumer finishes the draft.
     const ticket = await waitUntil(() => tickets().findOne({ idempotencyKey: draftId }), 40_000)
@@ -165,5 +206,5 @@ describe('outage -> queue -> consumer', () => {
     expect(await tickets().countDocuments({ idempotencyKey: draftId })).toBe(1)
 
     await waitForNoOutage()
-  })
+  }, 90_000)
 })

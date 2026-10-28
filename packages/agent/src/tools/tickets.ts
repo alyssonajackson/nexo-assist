@@ -29,6 +29,7 @@ export const listMyTickets = createTool({
         fx.shownTicketIds = tickets.map((t) => t.id)
         fx.shownAs = 'list'
         fx.overdueTicketIds = tickets.filter((t) => t.sla.overdue).map((t) => t.id)
+        fx.reopenableTicketIds = tickets.filter((t) => t.sla.reopenable).map((t) => t.id)
         return { ok: true as const, tickets: tickets.map(ticketForModel) }
       },
       (r) => {
@@ -60,6 +61,7 @@ export const getTicket = createTool({
           fx.shownTicketIds = [t.id]
           fx.shownAs = 'single'
           fx.overdueTicketIds = t.sla.overdue ? [t.id] : []
+          fx.reopenableTicketIds = t.sla.reopenable ? [t.id] : []
           const timeline = t.timeline
             .slice(-4)
             .map((e) => ({ em: e.at.toISOString(), tipo: e.kind, nota: e.note ?? null }))

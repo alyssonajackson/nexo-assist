@@ -1,4 +1,5 @@
 import {
+  TOOL_FAILED_LABELS,
   TOOL_LABELS,
   type Draft,
   type PriorityResult,
@@ -15,6 +16,8 @@ export type TurnEffects = {
   /** How they were shown: a list, or a single ticket card. */
   shownAs?: 'list' | 'single'
   overdueTicketIds: string[]
+  /** Shown tickets resolved within the reopen window (sla.reopenable, computed by the tickets service). */
+  reopenableTicketIds: string[]
   kbArticleIds: string[]
   /** Drafts proposed this turn (the last one is the live one). */
   drafts: Draft[]
@@ -34,6 +37,7 @@ export class TurnRecorder {
   readonly effects: TurnEffects = {
     shownTicketIds: [],
     overdueTicketIds: [],
+    reopenableTicketIds: [],
     kbArticleIds: [],
     drafts: [],
     refusals: [],
@@ -55,7 +59,7 @@ export class TurnRecorder {
       return result
     } catch (err) {
       const summary = err instanceof Error ? err.message : 'falhou'
-      this.push({ tool, label: TOOL_LABELS[tool], ok: false, ms: Date.now() - started, summary })
+      this.push({ tool, label: TOOL_FAILED_LABELS[tool], ok: false, ms: Date.now() - started, summary })
       throw err
     }
   }

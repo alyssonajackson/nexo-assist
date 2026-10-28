@@ -29,6 +29,8 @@ export type Scenario = {
     /** Tools that must have been called (and succeeded, unless listed in `refusedTools`). */
     tools?: ToolName[]
     refusedTools?: ToolName[]
+    /** The only tools the turn may call (e.g. read-only ones for an out-of-scope topic). */
+    onlyTools?: ToolName[]
     /** Rule overrides that must be recorded. */
     rules?: RuleName[]
     /** The draft left pending for the employee to confirm; null = no draft at all. */
@@ -240,8 +242,17 @@ export const SCENARIOS: Scenario[] = [
     title: 'Assunto de RH/financeiro é redirecionado',
     user: ana,
     message: 'Como peço o reembolso de uma viagem a trabalho?',
-    expect: { intent: ['out_of_scope'], action: ['redirect_out_of_scope'], draft: null, transfer: null },
+    // The first step must call a tool (run-turn.ts), so a KB lookup is accepted; anything that
+    // reads tickets, proposes or transfers is not.
+    expect: {
+      intent: ['out_of_scope'],
+      action: ['redirect_out_of_scope'],
+      onlyTools: ['search_kb'],
+      draft: null,
+      transfer: null,
+    },
     script: [
+      { tools: [{ name: 'search_kb', input: { query: 'reembolso de viagem' } }] },
       final({
         intent: 'out_of_scope',
         action: 'redirect_out_of_scope',

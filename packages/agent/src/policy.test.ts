@@ -5,8 +5,10 @@ import {
   applyPolicy,
   CONFIDENCE,
   DUPLICATE_QUICK_REPLIES,
+  OVERDUE_EXTRA_REPLY,
   OVERDUE_QUICK_REPLIES,
   REPLIES,
+  ticketsToShow,
   type PolicyInput,
 } from './policy'
 import type { TurnEffects } from './recorder'
@@ -14,6 +16,7 @@ import type { TurnEffects } from './recorder'
 const effects = (fx: Partial<TurnEffects> = {}): TurnEffects => ({
   shownTicketIds: [],
   overdueTicketIds: [],
+  reopenableTicketIds: [],
   kbArticleIds: [],
   drafts: [],
   refusals: [],
@@ -202,9 +205,146 @@ describe('applyPolicy', () => {
     expect(r.overrides).toEqual([])
   })
 
+  describe('reopen within the window', () => {
+    const back = { employeeMessage: 'A senha do SAP bloqueou de novo, é o mesmo problema do inc-20150.' }
+    const shown: Partial<TurnEffects> = {
+      shownTicketIds: ['INC-20150'],
+      shownAs: 'single',
+      reopenableTicketIds: ['INC-20150'],
+    }
+
+    it('proposes the reopen when the model only asked about a named, reopenable ticket', () => {
+      const r = run(
+        { intent: 'ticket_lookup', action: 'ask_clarification', quickReplies: ['Sim'] },
+        shown,
+        back,
+      )
+      expect(r.reopen).toEqual({
+        ticketId: 'INC-20150',
+        reason: `Ana Souza: "${back.employeeMessage}"`,
+      })
+      expect(r.decision).toMatchObject({ intent: 'ticket_reopen', action: 'propose_reopen' })
+      expect(r.decision.extracted.ticketId).toBe('INC-20150')
+      expect(r.decision.quickReplies).toBeUndefined()
+      expect(r.reply).toBe(REPLIES.reopen('INC-20150'))
+      expect(r.overrides).toEqual([expect.objectContaining({ rule: 'reopen_window', to: 'propose_reopen' })])
+    })
+
+    it('leaves it to the model when the ticket is not reopenable, not named, or already proposed', () => {
+      expect(
+        run({ action: 'ask_clarification' }, { ...shown, reopenableTicketIds: [] }, back).reopen,
+      ).toBeUndefined()
+      expect(
+        run({ action: 'ask_clarification' }, shown, { employeeMessage: 'A senha do SAP bloqueou de novo.' })
+          .reopen,
+      ).toBeUndefined()
+      expect(
+        run({ action: 'propose_reopen' }, { ...shown, drafts: [draft({ kind: 'reopen' })] }, back).reopen,
+      ).toBeUndefined()
+    })
+
+    it('needs a sign that the problem is back', () => {
+      const r = run({ intent: 'ticket_lookup', action: 'show_ticket' }, shown, {
+        employeeMessage: 'Qual o status do INC-20150?',
+      })
+      expect(r.reopen).toBeUndefined()
+      expect(r.decision.action).toBe('show_ticket')
+    })
+
+    it('does not retry a reopen the tool refused', () => {
+      const refusals: TurnEffects['refusals'] = [
+        { tool: 'propose_reopen', error: 'not_reopenable', message: 'passou do prazo' },
+      ]
+      const r = run({ action: 'propose_reopen' }, { ...shown, refusals }, back)
+      expect(r.reopen).toBeUndefined()
+      expect(r.reply).toBe('passou do prazo')
+    })
+  })
+
+  describe('overdue offer', () => {
+    const listed: Partial<TurnEffects> = {
+      shownTicketIds: ['INC-20311', 'INC-20298', 'REQ-10442'],
+      shownAs: 'list',
+      overdueTicketIds: ['INC-20311'],
+    }
+
+    it('is not made when the turn is not about the overdue ticket', () => {
+      // A clarification about a printer that happened to list every ticket.
+      const r = run({ action: 'ask_clarification' }, listed, { reply: 'Qual é a impressora?' })
+      expect(r.decision.quickReplies).toBeUndefined()
+      expect(r.overrides).toEqual([])
+    })
+
+    it('is made at most once per conversation', () => {
+      const r = run({ action: 'list_tickets' }, listed, { overdueOffered: true })
+      expect(r.decision.quickReplies).toBeUndefined()
+      expect(r.overrides).toEqual([])
+    })
+
+    it("keeps the model's options and adds the analyst next to them", () => {
+      const r = run({ action: 'list_tickets', quickReplies: ['Ver detalhes do INC-20311'] }, listed)
+      expect(r.decision.quickReplies).toEqual(['Ver detalhes do INC-20311', OVERDUE_EXTRA_REPLY])
+      expect(r.overrides.map((o) => o.rule)).toEqual(['overdue_offer'])
+    })
+
+    it('does not push out a full set of the model options', () => {
+      const own = ['a', 'b', 'c', 'd']
+      const r = run({ action: 'list_tickets', quickReplies: own }, listed)
+      expect(r.decision.quickReplies).toEqual(own)
+      expect(r.overrides).toEqual([])
+    })
+
+    it('does not replace the duplicate question options', () => {
+      const r = run(
+        { action: 'propose_draft' },
+        {
+          ...listed,
+          shownTicketIds: ['INC-20311'],
+          refusals: [
+            {
+              tool: 'propose_draft',
+              error: 'possible_duplicates',
+              message: 'Você já tem INC-20311. É o mesmo caso?',
+            },
+          ],
+        },
+      )
+      expect(r.decision.quickReplies).toEqual([...DUPLICATE_QUICK_REPLIES])
+      expect(r.overrides.map((o) => o.rule)).not.toContain('overdue_offer')
+    })
+  })
+
   it('never offers "Confirmar" as a quick reply', () => {
     const r = run({ quickReplies: ['Confirmar', 'Editar'] })
     expect(r.decision.quickReplies).toEqual(['Editar'])
+  })
+})
+
+describe('ticketsToShow', () => {
+  const fx = effects({ shownTicketIds: ['INC-20311', 'INC-20298', 'REQ-10442'], shownAs: 'list' })
+
+  it('shows everything a listing found', () => {
+    expect(ticketsToShow(decision({ action: 'list_tickets' }), 'Seus chamados:', fx)).toEqual(
+      fx.shownTicketIds,
+    )
+  })
+
+  it('shows only the tickets a clarification or answer names', () => {
+    expect(ticketsToShow(decision({ action: 'ask_clarification' }), 'Qual impressora?', fx)).toEqual([])
+    expect(ticketsToShow(decision({ action: 'reply' }), 'Você já tem o inc-20298.', fx)).toEqual([
+      'INC-20298',
+    ])
+  })
+
+  it('narrows a single-ticket action to the ticket the model names', () => {
+    const d = decision({ action: 'show_ticket', extracted: { ticketId: 'INC-20311' } })
+    expect(ticketsToShow(d, 'Está atrasado.', fx)).toEqual(['INC-20311'])
+    expect(ticketsToShow(decision({ action: 'show_ticket' }), 'Achei estes.', fx)).toEqual(fx.shownTicketIds)
+  })
+
+  it('drops the duplicate candidates once a new ticket draft is proposed', () => {
+    const withDraft = { ...fx, drafts: [draft()] }
+    expect(ticketsToShow(decision({ action: 'propose_draft' }), 'Não é o INC-20311.', withDraft)).toEqual([])
   })
 })
 

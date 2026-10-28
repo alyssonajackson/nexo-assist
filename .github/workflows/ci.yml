@@ -46,6 +46,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Start the stack
         run: docker compose up --build -d
+        env:
+          # No random outages: the e2e suite runs without retries. The integration tests force
+          # outages through the chaos endpoint instead.
+          FLAKY_ENABLED: 'false'
       - run: pnpm smoke
       - name: Integration tests
         run: pnpm test:integration
