@@ -2,7 +2,10 @@ import type { z } from 'zod'
 
 export type ConsumeOptions = {
   signal: AbortSignal
-  /** When it returns true the consumer pauses instead of receiving (e.g. during an outage). */
+  /**
+   * When it returns true the consumer pauses (e.g. during an outage). It is checked before each
+   * message: a message received while paused is neither handled nor deleted, it is redelivered later.
+   */
   paused?: () => boolean
 }
 
@@ -36,10 +39,17 @@ export class InMemoryEventQueue<T> implements EventQueue<T> {
     return this.pending.length
   }
 
-  /** Processes everything currently queued once. Returns how many messages were handled successfully. */
-  async drain(handler: (message: T) => Promise<void>): Promise<number> {
+  /**
+   * Processes everything currently queued once. Returns how many messages were handled successfully.
+   * Messages reached while `paused()` is true stay queued, without counting as a receive.
+   */
+  async drain(handler: (message: T) => Promise<void>, paused?: () => boolean): Promise<number> {
     let ok = 0
     for (const item of this.pending.splice(0)) {
+      if (paused?.()) {
+        this.pending.push(item)
+        continue
+      }
       item.receives++
       try {
         await handler(item.message)
@@ -54,7 +64,7 @@ export class InMemoryEventQueue<T> implements EventQueue<T> {
 
   async consume(handler: (message: T) => Promise<void>, { signal, paused }: ConsumeOptions): Promise<void> {
     while (!signal.aborted) {
-      if (!paused?.()) await this.drain(handler)
+      if (!paused?.()) await this.drain(handler, paused)
       await new Promise((r) => setTimeout(r, 10))
     }
   }
