@@ -9,15 +9,17 @@ import {
 } from '@nexo/shared'
 import type { TurnContext } from '../context'
 
-/** What a tool returns to the model when it could not do its job. The model explains it; it never retries blindly. */
-export type ToolRefusal = { ok: false; error: string; message: string; details?: unknown }
+/**
+ * What a tool returns when it could not (or must not) do its job. `message` is written for the
+ * employee (code may show it as the reply); `hint` tells the model what to do next.
+ */
+export type ToolRefusal = { ok: false; error: string; message: string; hint?: string; details?: unknown }
 
-export const refuse = (error: string, message: string, details?: unknown): ToolRefusal => ({
-  ok: false,
-  error,
-  message,
-  ...(details === undefined ? {} : { details }),
-})
+export const refuse = (
+  error: string,
+  message: string,
+  extra: { hint?: string; details?: unknown } = {},
+): ToolRefusal => ({ ok: false, error, message, ...extra })
 
 /**
  * Runs a tool body through the turn recorder. Ticket-system outages (after the client's retries) and
@@ -40,15 +42,20 @@ export async function runTool<T extends { ok: true }>(
       summarize,
     )
   } catch (err) {
-    if (err instanceof RefusedError) return err.refusal
-    if (err instanceof TicketsUnavailableError) {
-      return refuse(
-        'tickets_unavailable',
-        'Sistema de chamados indisponível no momento, mesmo depois de tentar novamente.',
-      )
-    }
-    if (err instanceof TicketsHttpError) return refuse(err.code, err.message)
-    throw err
+    const refusal =
+      err instanceof RefusedError
+        ? err.refusal
+        : err instanceof TicketsUnavailableError
+          ? refuse(
+              'tickets_unavailable',
+              'O sistema de chamados está indisponível agora. Tente de novo em alguns minutos.',
+            )
+          : err instanceof TicketsHttpError
+            ? refuse(err.code, err.message)
+            : null
+    if (!refusal) throw err
+    turn.recorder.effects.refusals.push({ tool, error: refusal.error, message: refusal.message })
+    return refusal
   }
 }
 

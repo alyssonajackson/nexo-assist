@@ -20,6 +20,8 @@ export type TurnEffects = {
   drafts: Draft[]
   priority?: PriorityResult
   transfer?: Omit<Transfer, 'at'>
+  /** Tools that refused (duplicate found, reopen window, ticket system down...), with the employee-facing message. */
+  refusals: { tool: ToolName; error: string; message: string }[]
 }
 
 /**
@@ -29,7 +31,13 @@ export type TurnEffects = {
 export class TurnRecorder {
   readonly toolsCalled: ToolCall[] = []
   readonly overrides: RuleOverride[] = []
-  readonly effects: TurnEffects = { shownTicketIds: [], overdueTicketIds: [], kbArticleIds: [], drafts: [] }
+  readonly effects: TurnEffects = {
+    shownTicketIds: [],
+    overdueTicketIds: [],
+    kbArticleIds: [],
+    drafts: [],
+    refusals: [],
+  }
 
   constructor(private readonly onToolCall?: (call: ToolCall) => void) {}
 

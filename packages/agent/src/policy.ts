@@ -5,7 +5,6 @@ import {
   type DraftKind,
   type ModelDecision,
   type RuleOverride,
-  type ToolCall,
   type Transfer,
 } from '@nexo/shared'
 import type { TurnEffects } from './recorder'
@@ -27,7 +26,6 @@ export type PolicyInput = {
   decision: ModelDecision
   reply: string
   effects: TurnEffects
-  toolsCalled: ToolCall[]
   employeeName: string
   employeeMessage: string
 }
@@ -68,6 +66,7 @@ export const REPLIES = {
 } as const
 
 export const OVERDUE_QUICK_REPLIES = ['Sim, falar com um analista', 'Não, obrigado'] as const
+export const DUPLICATE_QUICK_REPLIES = ['É o mesmo problema', 'É outro problema'] as const
 
 export function applyPolicy(input: PolicyInput): PolicyResult {
   const { effects, employeeName, employeeMessage } = input
@@ -134,10 +133,15 @@ export function applyPolicy(input: PolicyInput): PolicyResult {
   const claimedKind = PROPOSALS[decision.action]
   if (draft && claimedKind !== draft.kind) decision = { ...decision, action: ACTION_BY_KIND[draft.kind] }
   if (!draft && claimedKind) {
-    // A refused proposal (duplicate, reopen window...) is fine: the reply explains the refusal.
-    const refused = input.toolsCalled.some((c) => c.tool === decision.action && !c.ok)
-    if (refused) decision = { ...decision, action: 'ask_clarification' }
-    else {
+    // A refused proposal (duplicate, reopen window...): the model may still write "preparei o
+    // rascunho", so the reply comes from the refusal itself, written by code.
+    const refusal = effects.refusals.filter((r) => r.tool === decision.action).at(-1)
+    if (refusal) {
+      decision = { ...decision, action: 'ask_clarification' }
+      reply = refusal.message
+      if (refusal.error === 'possible_duplicates')
+        decision = { ...decision, quickReplies: [...DUPLICATE_QUICK_REPLIES] }
+    } else {
       setAction(
         'ask_clarification',
         'action_without_tool',
@@ -220,23 +224,24 @@ function withoutConfirmReplies(decision: ModelDecision): ModelDecision {
 }
 
 /**
- * After the employee confirms a draft and it is registered. Annex A: critical cases go to an analyst,
- * so a committed critical ticket transfers the conversation automatically.
+ * After the employee confirms a draft (registered now, or queued while the ticket system is down).
+ * Annex A: critical cases go to an analyst, so a confirmed critical ticket transfers the conversation.
  */
 export function afterCommit(
   draft: Draft,
-  ticketId: string,
+  ticketId: string | undefined,
   employeeName: string,
 ): { transfer?: TransferPlan; override?: RuleOverride } {
-  const priority = draft.fields?.priority
-  if (draft.kind !== 'create' || priority !== 'critical') return {}
+  const fields = draft.fields
+  if (draft.kind !== 'create' || fields?.priority !== 'critical') return {}
+  const ref = ticketId ?? `o rascunho ${draft.id} (pendente de registro)`
   return {
     transfer: {
       reason: 'critical',
       by: 'rule',
-      ticketId,
+      ...(ticketId ? { ticketId } : {}),
       summary:
-        `${employeeName} abriu o ${ticketId} (${PRIORITY_LABELS[priority]}): ${draft.fields?.title ?? ''}. ${draft.fields?.description ?? ''}`.slice(
+        `${employeeName} abriu ${ref} (${PRIORITY_LABELS.critical}): ${fields.title}. ${fields.description}`.slice(
           0,
           1000,
         ),
@@ -245,7 +250,7 @@ export function afterCommit(
       rule: 'critical_transfer',
       from: 'commit_draft',
       to: 'transfer_to_analyst',
-      why: `Chamado ${ticketId} é crítico: transferência automática para um analista.`,
+      why: `${ticketId ?? draft.id} é crítico: transferência automática para um analista.`,
     },
   }
 }

@@ -33,7 +33,7 @@ export const transferToAnalyst = createTool({
         }
         // Atomic state change (agent -> waiting_analyst); from now on the chat API stops calling the agent.
         if (!(await turn.ports.handoff.transfer(turn.conversationId, transfer))) {
-          return refuse('not_with_agent', 'A conversa já não está com o agente.')
+          return refuse('not_with_agent', 'Esta conversa já está com um analista.')
         }
         turn.recorder.effects.transfer = transfer
         return { ok: true as const, transferred: true }

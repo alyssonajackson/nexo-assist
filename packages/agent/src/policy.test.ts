@@ -4,6 +4,7 @@ import {
   afterCommit,
   applyPolicy,
   CONFIDENCE,
+  DUPLICATE_QUICK_REPLIES,
   OVERDUE_QUICK_REPLIES,
   REPLIES,
   type PolicyInput,
@@ -15,6 +16,7 @@ const effects = (fx: Partial<TurnEffects> = {}): TurnEffects => ({
   overdueTicketIds: [],
   kbArticleIds: [],
   drafts: [],
+  refusals: [],
   ...fx,
 })
 
@@ -50,7 +52,6 @@ const run = (d: Partial<ModelDecision>, fx: Partial<TurnEffects> = {}, extra: Pa
     decision: decision(d),
     reply: 'resposta do modelo',
     effects: effects(fx),
-    toolsCalled: [],
     employeeName: 'Ana Souza',
     employeeMessage: 'mensagem',
     ...extra,
@@ -135,15 +136,18 @@ describe('applyPolicy', () => {
     expect(r.overrides[0]?.rule).toBe('action_without_tool')
   })
 
-  it('accepts a refused proposal without inventing an override', () => {
+  it('answers a refused proposal with the refusal, written by code', () => {
     const r = run(
-      { action: 'propose_reopen' },
-      {},
+      { action: 'propose_draft' },
       {
-        toolsCalled: [{ tool: 'propose_reopen', label: 'x', ok: false, ms: 1 }],
+        refusals: [
+          { tool: 'propose_draft', error: 'possible_duplicates', message: 'Você já tem INC-20311...' },
+        ],
       },
     )
     expect(r.decision.action).toBe('ask_clarification')
+    expect(r.reply).toBe('Você já tem INC-20311...')
+    expect(r.decision.quickReplies).toEqual([...DUPLICATE_QUICK_REPLIES])
     expect(r.overrides).toEqual([])
   })
 

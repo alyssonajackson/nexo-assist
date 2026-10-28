@@ -70,7 +70,8 @@ export const proposeDraft = createTool({
         if (input.affected === 'unknown') {
           return refuse(
             'missing_fields',
-            'Falta saber quem é afetado (só a pessoa, a equipe ou a empresa). Pergunte antes.',
+            'Para montar o chamado, preciso saber quem é afetado: só você, sua equipe ou toda a empresa?',
+            { hint: 'Pergunte quem é afetado antes de chamar propose_draft de novo.' },
           )
         }
 
@@ -86,11 +87,17 @@ export const proposeDraft = createTool({
             from: 'propose_draft',
             why: `Já existe chamado parecido: ${open.map((c) => c.ticket.id).join(', ')}.`,
           })
+          const ids = open.map((c) => c.ticket.id).join(', ')
           return refuse(
             'possible_duplicates',
-            'Há chamados do funcionário que podem ser o mesmo problema. Mostre-os e pergunte. Se for o mesmo: ' +
-              `propose_update (em aberto) ou propose_reopen (resolvido há até ${REOPEN_WINDOW_DAYS} dias).`,
-            { candidates: open.map((c) => ticketForModel(c.ticket)) },
+            `Antes de abrir outro chamado: você já tem ${ids}, que pode ser o mesmo problema. É o mesmo caso? Se for, eu complemento o chamado existente.`,
+            {
+              hint:
+                'Compare os candidatos com o pedido. Se for o mesmo problema: propose_update (em aberto) ou ' +
+                `propose_reopen (resolvido há até ${REOPEN_WINDOW_DAYS} dias). Se for claramente outro assunto: ` +
+                'chame propose_draft de novo AGORA, com notDuplicateOf (ids e motivo).',
+              details: { candidates: open.map((c) => ticketForModel(c.ticket)) },
+            },
           )
         }
         if (input.notDuplicateOf) {
@@ -155,12 +162,19 @@ export const proposeUpdate = createTool({
         const ticket = await loadOwnTicket(turn, ticketId)
         if ('ok' in ticket) return ticket
         if (ticket.status === 'resolved') {
-          return refuse('resolved', `O ${ticket.id} está resolvido. Para continuar nele, use propose_reopen.`)
+          return refuse(
+            'resolved',
+            `O ${ticket.id} já está resolvido. Se o problema voltou, posso reabri-lo.`,
+            {
+              hint: 'Use propose_reopen.',
+            },
+          )
         }
         if (ticket.status === 'closed') {
           return refuse(
             'closed',
-            `O ${ticket.id} está encerrado e não aceita atualizações. Proponha um novo chamado.`,
+            `O ${ticket.id} está encerrado e não aceita mais atualizações. Posso abrir um novo chamado citando ele.`,
+            { hint: 'Proponha um novo chamado (propose_draft).' },
           )
         }
         const draft = await turn.ports.drafts.propose({
@@ -205,11 +219,17 @@ export const proposeReopen = createTool({
             from: 'propose_reopen',
             why: `${ticket.id} não pode ser reaberto (${ticket.status === 'resolved' ? `resolvido há mais de ${REOPEN_WINDOW_DAYS} dias` : 'não está resolvido'}).`,
           })
+          const finished = ticket.status === 'resolved' || ticket.status === 'closed'
           return refuse(
             'not_reopenable',
-            ticket.status === 'resolved' || ticket.status === 'closed'
-              ? `O ${ticket.id} passou do prazo de ${REOPEN_WINDOW_DAYS} dias para reabrir. Proponha um novo chamado citando o antigo.`
-              : `O ${ticket.id} ainda está em aberto. Use propose_update.`,
+            finished
+              ? `O ${ticket.id} passou do prazo de ${REOPEN_WINDOW_DAYS} dias para reabrir. Posso abrir um novo chamado citando ele.`
+              : `O ${ticket.id} ainda está em aberto; posso acrescentar a informação nele.`,
+            {
+              hint: finished
+                ? 'Proponha um novo chamado (propose_draft) citando o antigo.'
+                : 'Use propose_update.',
+            },
           )
         }
         const draft = await turn.ports.drafts.propose({

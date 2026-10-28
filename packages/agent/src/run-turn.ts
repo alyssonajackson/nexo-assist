@@ -76,7 +76,6 @@ export async function runTurn(input: TurnInput): Promise<TurnResult> {
     decision: model.decision,
     reply: model.reply,
     effects: recorder.effects,
-    toolsCalled: recorder.toolsCalled,
     employeeName: input.user.name,
     employeeMessage: input.text,
   })
