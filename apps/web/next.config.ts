@@ -9,6 +9,8 @@ try {
 }
 
 const config: NextConfig = {
+  // The browser e2e suite sets this, so its `next dev` can run next to another dev server.
+  distDir: process.env.NEXT_DIST_DIR ?? '.next',
   // Self-contained server for the Docker image.
   output: 'standalone',
   outputFileTracingRoot: path.join(import.meta.dirname, '../..'),
