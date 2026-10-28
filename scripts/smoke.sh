@@ -47,6 +47,6 @@ echo "smoke: ok - init exited 0"
 wait_for "tickets is healthy" tickets is_healthy tickets
 wait_for "tickets /health" tickets http_ok "$TICKETS_URL/health" '"ok":true'
 wait_for "web /api/health" web http_ok "$WEB_URL/api/health" '"ok":true'
-wait_for "web root renders" web http_ok "$WEB_URL/" '<html'
+wait_for "web login page renders" web http_ok "$WEB_URL/login" "Entrar"
 
 echo "smoke: all checks passed"
