@@ -17,3 +17,5 @@ coverage/
 *.db
 .beads-credential-key
 .beads/proxieddb/
+next-env.d.ts
+*.tsbuildinfo

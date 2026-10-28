@@ -1,0 +1,6 @@
+@import 'tailwindcss';
+@import '../styles/theme.css';
+
+body {
+  @apply bg-surface text-ink font-sans antialiased;
+}

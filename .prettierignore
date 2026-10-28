@@ -6,3 +6,6 @@ pnpm-lock.yaml
 **/dist
 CLAUDE.md
 AGENTS.md
+.agents
+.claude
+.codex
