@@ -1,38 +1,35 @@
 'use client'
 
-import { useCallback, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 
 /**
- * Keeps a scroll container pinned to the bottom while its content grows (streamed text, chips, cards
- * that load after the turn), unless the employee scrolled up to read something.
+ * Follows the conversation: whenever `contentKey` changes (a message, streamed text, a chip, cards that
+ * load after the turn), scroll to the bottom, unless the employee scrolled up to read something.
+ * Opening a decision panel does not change the key, so it never fights the panel's own scroll.
  */
-export function useStickToBottom<S extends HTMLElement, C extends HTMLElement>() {
+export function useStickToBottom<S extends HTMLElement>(contentKey: string, forcePin: boolean) {
   const scroller = useRef<S>(null)
-  const content = useRef<C>(null)
   const pinned = useRef(true)
 
   useEffect(() => {
     const el = scroller.current
-    const inner = content.current
-    if (!el || !inner) return
+    if (!el) return
     const onScroll = () => {
       pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
     }
-    const observer = new ResizeObserver(() => {
-      if (pinned.current) el.scrollTop = el.scrollHeight
-    })
     el.addEventListener('scroll', onScroll, { passive: true })
-    observer.observe(inner)
-    el.scrollTop = el.scrollHeight
-    return () => {
-      el.removeEventListener('scroll', onScroll)
-      observer.disconnect()
-    }
+    return () => el.removeEventListener('scroll', onScroll)
   }, [])
 
-  /** After the employee sends something, follow the conversation again. */
-  const pin = useCallback(() => {
-    pinned.current = true
-  }, [])
-  return { scroller, content, pin }
+  // A new turn always brings the view back to the bottom.
+  useEffect(() => {
+    if (forcePin) pinned.current = true
+  }, [forcePin])
+
+  useEffect(() => {
+    const el = scroller.current
+    if (el && pinned.current) el.scrollTop = el.scrollHeight
+  }, [contentKey])
+
+  return scroller
 }

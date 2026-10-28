@@ -1,4 +1,6 @@
-import type { ReactNode } from 'react'
+'use client'
+
+import { useEffect, useRef, type ReactNode } from 'react'
 import { Check, Cpu, ShieldCheck, X } from 'lucide-react'
 import { ACTION_LABELS, CONFIDENCE, RULE_LABELS, type Decision } from '@nexo/shared'
 import { decisionLabel, extractedRows, intentLabel } from '@/lib/chat/decision-view'
@@ -12,11 +14,17 @@ import { confidenceLevel, formatConfidence, formatMs, type ConfidenceLevel } fro
  */
 export function DecisionPanel({ decision, id }: { decision: Decision; id: string }) {
   const rows = extractedRows(decision.extracted)
+  // Opening the panel brings it into view (the chat would otherwise stay pinned to the bottom).
+  const ref = useRef<HTMLElement>(null)
+  useEffect(() => {
+    ref.current?.scrollIntoView({ block: 'nearest' })
+  }, [])
   return (
     <section
+      ref={ref}
       id={id}
       aria-label="Detalhes da decisão"
-      className="w-full rounded-xl bg-surface-muted p-4 outline outline-1 -outline-offset-[.5px] outline-border"
+      className="w-full scroll-mt-10 rounded-xl bg-surface-muted p-4 outline outline-1 -outline-offset-[.5px] outline-border"
     >
       <header className="flex items-center gap-2 border-b border-border pb-3">
         <h3 className="text-[13.5px] font-semibold text-ink">Como o Nexo Assist decidiu</h3>
