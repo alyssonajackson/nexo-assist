@@ -1,4 +1,5 @@
 # One-shot init container: replica set, Cognito pool/users, seed. Runs TypeScript with tsx.
+# Online, the same image (or `pnpm init:local` from a laptop) runs once with MANAGED_INFRA=true.
 FROM node:24-alpine
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable
