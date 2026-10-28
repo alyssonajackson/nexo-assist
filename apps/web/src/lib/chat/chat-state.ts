@@ -185,3 +185,20 @@ export function pickedOption(messages: Message[], afterId: string, options: stri
   const text = reply.text.trim().toLocaleLowerCase('pt-BR')
   return options.find((o) => text.startsWith(o.trim().toLocaleLowerCase('pt-BR')))
 }
+
+const draftIdsOf = (m: Message): string[] => m.parts.flatMap((p) => (p.type === 'draft' ? [p.draftId] : []))
+
+/**
+ * A draft can be referenced by several messages (proposed, then "pendente de registro"). Its card is
+ * drawn once, on the message that proposed it, and shows the current status there.
+ */
+export function draftCardOwners(messages: Message[]): Map<string, string> {
+  const owners = new Map<string, string>()
+  for (const m of messages) for (const id of draftIdsOf(m)) if (!owners.has(id)) owners.set(id, m.id)
+  return owners
+}
+
+/** The draft that ⌘↵ confirms: the most recent one still waiting for the employee. */
+export function activeDraftId(state: ChatState): string | undefined {
+  return state.messages.flatMap(draftIdsOf).findLast((id) => state.drafts[id]?.status === 'pending')
+}
