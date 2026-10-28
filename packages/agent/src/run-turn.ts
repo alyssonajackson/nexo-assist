@@ -4,7 +4,7 @@ import type { AssistAgent } from './agent'
 import { TURN_KEY, type AgentPorts, type AgentUser, type TurnContext } from './context'
 import { toModelMessages } from './history'
 import { AgentOutput, repairOutput, toModelDecision } from './output'
-import { applyPolicy, type TransferPlan } from './policy'
+import { applyPolicy, ticketsToShow, type TransferPlan } from './policy'
 import { TurnRecorder, type TurnEffects } from './recorder'
 
 /** Streamed to the chat while the turn runs. */
@@ -99,6 +99,9 @@ export async function runTurn(input: TurnInput): Promise<TurnResult> {
     effects: recorder.effects,
     employeeName: input.user.name,
     employeeMessage: input.text,
+    overdueOffered: input.history.some((m) =>
+      m.decision?.ruleOverrides.some((o) => o.rule === 'overdue_offer'),
+    ),
   })
 
   // Execute what the rules decided.
@@ -129,7 +132,12 @@ export async function runTurn(input: TurnInput): Promise<TurnResult> {
   return {
     reply: policy.reply,
     decision,
-    parts: buildParts(recorder.effects, cancelled, transfer ? undefined : decision.quickReplies),
+    parts: buildParts(
+      recorder.effects,
+      ticketsToShow(policy.decision, policy.reply, recorder.effects),
+      cancelled,
+      transfer ? undefined : decision.quickReplies,
+    ),
     ...(transfer ? { transfer } : {}),
   }
 }
@@ -220,13 +228,14 @@ function rawOutput(err: unknown): string {
 
 function buildParts(
   fx: TurnEffects,
+  ticketIds: string[],
   cancelled: Set<string>,
   quickReplies: string[] | undefined,
 ): MessagePart[] {
   const parts: MessagePart[] = []
-  const [first] = fx.shownTicketIds
+  const [first] = ticketIds
   if (fx.shownAs === 'single' && first) parts.push({ type: 'ticket', ticketId: first })
-  else if (fx.shownTicketIds.length) parts.push({ type: 'ticket_list', ticketIds: fx.shownTicketIds })
+  else if (ticketIds.length) parts.push({ type: 'ticket_list', ticketIds })
   const draft = fx.drafts.filter((d) => !cancelled.has(d.id)).at(-1)
   if (draft) parts.push({ type: 'draft', draftId: draft.id })
   if (quickReplies?.length) parts.push({ type: 'quick_replies', options: quickReplies.slice(0, 4) })

@@ -27,6 +27,8 @@ export type PolicyInput = {
   effects: TurnEffects
   employeeName: string
   employeeMessage: string
+  /** An earlier turn of this conversation already offered an analyst for an overdue ticket. */
+  overdueOffered?: boolean
 }
 
 export type PolicyResult = {
@@ -69,6 +71,8 @@ export const REPLIES = {
 } as const
 
 export const OVERDUE_QUICK_REPLIES = ['Sim, falar com um analista', 'Não, obrigado'] as const
+/** Added to the model's own options when it asked something else (the overdue offer must not replace them). */
+export const OVERDUE_EXTRA_REPLY = 'Falar com um analista'
 export const DUPLICATE_QUICK_REPLIES = ['É o mesmo problema', 'É outro problema'] as const
 
 export function applyPolicy(input: PolicyInput): PolicyResult {
@@ -226,13 +230,21 @@ export function applyPolicy(input: PolicyInput): PolicyResult {
   }
 
   // Annex A: an overdue ticket must be offered to an analyst (decision #2: offer, transfer on "sim").
-  if (effects.overdueTicketIds.length && !transfer) {
-    const offered = decision.quickReplies?.some((q) => /analista/i.test(q)) ?? false
-    if (!offered) {
-      decision = { ...decision, quickReplies: [...OVERDUE_QUICK_REPLIES] }
+  // Only on a lookup that shows the overdue ticket, and once per conversation. The model's own options
+  // answer the question its reply asks, so they are kept and the analyst is added next to them.
+  const overdue = ticketsToShow(decision, reply, effects).filter((id) =>
+    effects.overdueTicketIds.includes(id),
+  )
+  const lookup = decision.action === 'list_tickets' || decision.action === 'show_ticket'
+  if (overdue.length && lookup && !transfer && !input.overdueOffered) {
+    const own = decision.quickReplies ?? []
+    const offered = own.some((q) => /analista/i.test(q))
+    const quickReplies = own.length ? [...own, OVERDUE_EXTRA_REPLY] : [...OVERDUE_QUICK_REPLIES]
+    if (!offered && quickReplies.length <= MAX_QUICK_REPLIES) {
+      decision = { ...decision, quickReplies }
       overrides.push({
         rule: 'overdue_offer',
-        why: `${effects.overdueTicketIds.join(', ')} passou do SLA: oferecer transferência para um analista.`,
+        why: `${overdue.join(', ')} passou do SLA: oferecer transferência para um analista.`,
       })
     }
   }
@@ -240,7 +252,27 @@ export function applyPolicy(input: PolicyInput): PolicyResult {
   return { decision, reply, overrides, ...(transfer ? { transfer } : {}), cancelDraftIds }
 }
 
+const MAX_QUICK_REPLIES = 4
 const TICKET_ID = /\b(?:INC|REQ)-\d{5}\b/gi
+const SHOWING: Action[] = ['list_tickets', 'show_ticket', 'propose_update', 'propose_reopen']
+
+/**
+ * The ticket cards for this turn: only the tickets the turn is about, not everything a tool read.
+ * A listing shows what list_my_tickets found; showing one ticket or proposing a change to it shows the
+ * ones the model names (or what the tools found if it names none); any other turn shows only tickets
+ * its reply names (e.g. "você já tem INC-20311"). Once a new ticket's draft is proposed, the duplicate
+ * candidates it was checked against are no longer shown.
+ */
+export function ticketsToShow(decision: ModelDecision, reply: string, effects: TurnEffects): string[] {
+  const shown = effects.shownTicketIds
+  if (effects.drafts.some((d) => d.kind === 'create')) return []
+  if (decision.action === 'list_tickets') return shown
+  const named = [...(reply.match(TICKET_ID) ?? []), decision.extracted.ticketId ?? ''].map((id) =>
+    id.toUpperCase(),
+  )
+  const referenced = shown.filter((id) => named.includes(id))
+  return SHOWING.includes(decision.action) && !referenced.length ? shown : referenced
+}
 const REOPEN_WORDS = /\b(de novo|novamente|outra vez|voltou|voltaram|reabr\w*)\b/i
 
 /**
