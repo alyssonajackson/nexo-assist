@@ -13,6 +13,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:integration": "pnpm --filter @nexo/tests test:integration",
+    "smoke": "./scripts/smoke.sh",
     "init:local": "pnpm --filter @nexo/scripts init:local",
     "seed:reset": "pnpm --filter @nexo/scripts seed:reset",
     "format": "prettier --write .",

@@ -1,0 +1,17 @@
+{
+  "name": "@nexo/tests",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:integration": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.1158.0",
+    "@aws-sdk/client-sqs": "^3.1158.0",
+    "@nexo/shared": "workspace:*",
+    "jose": "^6.2.13",
+    "mongodb": "^7.7.0"
+  }
+}
