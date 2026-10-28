@@ -13,7 +13,7 @@ export type JwtVerifierConfig = {
 
 /**
  * Verifies a Cognito access token: RS256 signature against the pool's JWKS, issuer, expiry,
- * token_use and client_id. Works the same for real Cognito and cognito-local.
+ * token_use and client_id. Works the same for real Cognito and Floci.
  * (aws-jwt-verify hard-codes the AWS host, so jose is used to keep one code path.)
  */
 export function createJwtVerifier(config: JwtVerifierConfig) {

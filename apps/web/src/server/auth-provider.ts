@@ -4,7 +4,7 @@ import { cognitoClient, CognitoAuthProvider, resolveCognitoConfig } from '@nexo/
 
 const globalForAuth = globalThis as unknown as { nexoAuthProvider?: Promise<AuthProvider> }
 
-/** Cognito (or cognito-local) behind the AuthProvider port. Pool and client ids are resolved once. */
+/** Cognito (or Floci) behind the AuthProvider port. Pool and client ids are resolved once. */
 export function authProvider(): Promise<AuthProvider> {
   globalForAuth.nexoAuthProvider ??= (async () => {
     const client = cognitoClient()

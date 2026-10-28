@@ -36,8 +36,7 @@ http_ok() { curl -fsS --max-time 5 "$1" | grep -q "$2"; }
 [[ -n "$(docker compose ps -a -q 2>/dev/null)" ]] || fail "the stack is not up; run: docker compose up --build -d"
 
 wait_for "mongo is healthy" mongo is_healthy mongo
-wait_for "cognito is running" cognito is_running cognito
-wait_for "elasticmq is running" elasticmq is_running elasticmq
+wait_for "floci (Cognito + SQS) is healthy" floci is_healthy floci
 
 # init is one-shot: wait for it to exit, then require exit code 0.
 wait_for "init finished" init has_exited init

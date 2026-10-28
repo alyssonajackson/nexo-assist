@@ -1,16 +1,16 @@
 /**
  * One-shot, idempotent bootstrap for local runs (the `init` container, or `pnpm init:local`):
  * 1. MongoDB single-node replica set
- * 2. Cognito user pool, app client, groups and seeded users (cognito-local or real Cognito)
- * 3. Seed data relative to "now" (only when empty, when Cognito ids changed, or with --reset)
- *
- * SQS queues need no step here: ElasticMQ creates them from docker/elasticmq/elasticmq.conf.
+ * 2. Cognito user pool, app client, groups and seeded users (Floci or real Cognito)
+ * 3. SQS queues and their dead-letter queues (Floci or real SQS)
+ * 4. Seed data relative to "now" (only when empty, when Cognito ids changed, or with --reset)
  */
 import { MongoClient } from 'mongodb'
 import { ASSIST_COLLECTIONS, DB } from '@nexo/shared'
-import { cognitoClient } from '@nexo/shared/aws'
+import { cognitoClient, sqsClient } from '@nexo/shared/aws'
 import { ensureUser, ensureUserPool } from './lib/cognito'
 import { ensureReplicaSet } from './lib/mongo'
+import { ensureQueues } from './lib/queues'
 import { seedAssistDb, seedTicketsDb, seedUsers, type UserIds } from './seed/seed'
 
 const env = {
@@ -36,6 +36,8 @@ async function main() {
     })
   }
   console.log(`cognito: pool ${userPoolId}, client ${clientId}, ${seedUsers.length} users`)
+
+  await ensureQueues(sqsClient())
 
   const mongo = new MongoClient(env.mongoUri)
   await mongo.connect()

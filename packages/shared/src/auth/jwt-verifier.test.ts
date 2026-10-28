@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { UnauthorizedError } from './auth'
 import { createJwtVerifier } from './jwt-verifier'
 
-const issuer = 'http://localhost:9229/local_test'
+const issuer = 'http://localhost:4566/local_test'
 const clientId = 'web-client'
 let sign: (claims: JWTPayload, opts?: { expiresIn?: string; issuer?: string }) => Promise<string>
 let verify: ReturnType<typeof createJwtVerifier>

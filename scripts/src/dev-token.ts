@@ -1,13 +1,13 @@
 /**
  * Prints a Cognito access token for a seeded user, for calling the tickets API by hand:
- *   TOKEN=$(pnpm -s token ana) && curl -H "authorization: Bearer $TOKEN" localhost:4000/tickets
+ *   TOKEN=$(pnpm --silent dev:token ana) && curl -H "authorization: Bearer $TOKEN" localhost:4000/tickets
  * Users: ana, bruno, carla, diego (employees), rafael (analyst).
  */
 import { cognitoClient, CognitoAuthProvider, resolveCognitoConfig } from '@nexo/shared/aws'
 import { seedUsers } from './seed/seed'
 
-process.env.COGNITO_ENDPOINT ??= 'http://localhost:9229'
-process.env.COGNITO_ISSUER_DOMAIN ??= 'http://localhost:9229'
+process.env.COGNITO_ENDPOINT ??= 'http://localhost:4566'
+process.env.COGNITO_ISSUER_DOMAIN ??= 'http://localhost:4566'
 process.env.AWS_ACCESS_KEY_ID ??= 'local'
 process.env.AWS_SECRET_ACCESS_KEY ??= 'local'
 

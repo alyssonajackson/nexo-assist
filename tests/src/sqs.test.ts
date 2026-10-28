@@ -37,7 +37,7 @@ const receiveOnce = async (url: string) => {
   return res.Messages?.[0]
 }
 
-describe('ElasticMQ queues', () => {
+describe('Floci queues', () => {
   it('has the three queues and their dead-letter queues', async () => {
     const res = await sqs.send(new ListQueuesCommand({}))
     const names = (res.QueueUrls ?? []).map((url) => url.split('/').at(-1))
@@ -98,19 +98,23 @@ describe('dead-letter queue', () => {
   })
 })
 
-// Restarts the shared ElasticMQ container, so it is opt-in (CI turns it on).
+// Restarts the shared Floci container, so it is opt-in (CI turns it on).
 describe.runIf(env.INTEGRATION_RESTARTS === '1')('message persistence', () => {
-  it('keeps a pending message across an ElasticMQ restart', async () => {
-    // A DLQ from the config: queues defined there exist after a restart, and nothing consumes it.
+  it('keeps the queues and a pending message across a Floci restart', async () => {
+    // A DLQ: nothing consumes it, so the message stays until we read it back.
     const url = await queueUrl('ticket-writes-dlq')
     const body = JSON.stringify({ test: randomUUID() })
     await sqs.send(new SendMessageCommand({ QueueUrl: url, MessageBody: body }))
 
-    await promisify(execFile)('docker', ['compose', 'restart', 'elasticmq'], {
+    await promisify(execFile)('docker', ['compose', 'restart', 'floci'], {
       cwd: resolve(import.meta.dirname, '../..'),
     })
-    // The server answers a moment before it has recreated the configured queues.
+    // Persistent storage: the queues come back without the init step running again.
     await waitFor(() => queueUrl('ticket-writes-dlq'))
+    const names = ((await sqs.send(new ListQueuesCommand({}))).QueueUrls ?? []).map((u) =>
+      u.split('/').at(-1),
+    )
+    for (const q of QUEUES) expect(names).toEqual(expect.arrayContaining([q, `${q}-dlq`]))
 
     const res = await sqs.send(
       new ReceiveMessageCommand({

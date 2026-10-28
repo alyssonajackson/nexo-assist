@@ -19,7 +19,7 @@ const CREDENTIAL_ERRORS = new Set([
   'InvalidPasswordException',
 ])
 
-/** AuthProvider backed by Cognito (or cognito-local): USER_PASSWORD_AUTH plus JWT verification. */
+/** AuthProvider backed by Cognito (or Floci): USER_PASSWORD_AUTH plus JWT verification. */
 export class CognitoAuthProvider implements AuthProvider {
   private readonly verifyToken: (token: string) => Promise<AuthUser>
 

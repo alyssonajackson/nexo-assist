@@ -74,12 +74,12 @@ Alysson wants the reviewers to see hands-on AWS skills, so two AWS services are 
 
 Environments:
 
-- **Local (Docker):** `cognito-local` (open-source emulator, no account needed) for Cognito. For SQS use an emulator that needs no account or token: ElasticMQ is the first choice; check LocalStack's current licence before using it, because it may require an auth token. Dummy AWS credentials live in `.env.example`. A reviewer must be able to run everything with no AWS account.
+- **Local (Docker):** Floci (MIT, no account or token), one pinned container on `:4566` that emulates both Cognito and SQS. LocalStack is not an option: since March 2026 it requires an account and an auth token. (History: we started on cognito-local + ElasticMQ, then swapped to Floci after a spike, nx-4qf.) The init script creates the queues and DLQs through the AWS SDK (`ensureQueues()`). Dummy AWS credentials live in `.env.example`. A reviewer must be able to run everything with no AWS account.
 - **Online (after the project is done):** Alysson's personal AWS account with a real Cognito user pool and real SQS queues, created with a small script or IaC (CDK or Terraform, whichever is quicker to explain). Guardrails: a dedicated IAM user with least privilege (only Cognito and SQS for this project), an AWS Budget alert, no secrets in git, and the IAM keys only in the hosting platform's secrets.
 
 ## Running locally (Docker)
 
-- `docker compose up --build` must bring up the whole app: mongo (single-node replica set), cognito-local, the SQS emulator, the tickets service, and web. The replica set, indexes, the Cognito user pool with seeded users, the queues, and the seed data are created automatically on the first start (an init container or script).
+- `docker compose up --build` must bring up the whole app: mongo (single-node replica set), Floci (Cognito and SQS), the tickets service, and web. The replica set, indexes, the Cognito user pool with seeded users, the queues, and the seed data are created automatically on the first start (an init container or script).
 - Every key goes in `.env`, which is gitignored. `.env.example` lists all the variables. No secret ever goes in the code or the image.
 - Document a fast dev loop in the README as well (`pnpm dev` against the dockerized mongo, Cognito, and SQS emulators).
 

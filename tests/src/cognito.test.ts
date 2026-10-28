@@ -5,7 +5,7 @@ import { ASSIST_COLLECTIONS, DB } from '@nexo/shared'
 import { cognitoConfig, login } from './helpers/cognito'
 import { connectMongo, type SeedMeta } from './helpers/mongo'
 
-describe('Cognito login (cognito-local)', () => {
+describe('Cognito login (Floci)', () => {
   let mongo: MongoClient
   let seededIds: Record<string, string>
   beforeAll(async () => {
@@ -34,13 +34,12 @@ describe('Cognito login (cognito-local)', () => {
   })
 
   it('rejects a wrong password', async () => {
-    // Real Cognito answers NotAuthorizedException; cognito-local answers InvalidPasswordException.
     const error = await login('ana.souza@nexo.com.br', 'wrong-password').then(
       () => undefined,
       (err: unknown) => err,
     )
     expect(error).toBeInstanceOf(Error)
-    expect(['NotAuthorizedException', 'InvalidPasswordException']).toContain((error as Error).name)
+    expect((error as Error).name).toBe('NotAuthorizedException')
   })
 
   it('signs tokens that verify against the JWKS with the expected issuer', async () => {
@@ -52,7 +51,7 @@ describe('Cognito login (cognito-local)', () => {
     expect(payload.token_use).toBe('access')
 
     await expect(
-      jwtVerify(accessToken, jwks, { issuer: 'http://localhost:9229/other-pool' }),
+      jwtVerify(accessToken, jwks, { issuer: 'http://localhost:4566/other-pool' }),
     ).rejects.toThrow()
   })
 })

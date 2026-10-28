@@ -10,7 +10,7 @@ type Queues = {
 
 const globalForQueues = globalThis as unknown as { nexoQueues?: Queues }
 
-/** SQS (ElasticMQ locally). Never in the employee's happy path: only outages and handoff events. */
+/** SQS (Floci locally). Never in the employee's happy path: only outages and handoff events. */
 export function queues(): Queues {
   if (!globalForQueues.nexoQueues) {
     const client = sqsClient()

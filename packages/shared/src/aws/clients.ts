@@ -2,7 +2,7 @@ import { CognitoIdentityProviderClient } from '@aws-sdk/client-cognito-identity-
 import { SQSClient } from '@aws-sdk/client-sqs'
 
 /**
- * AWS SDK v3 clients. The only difference between local (cognito-local / ElasticMQ) and AWS
+ * AWS SDK v3 clients. The only difference between local (Floci) and AWS
  * is the endpoint and the credentials, both from env. Without an endpoint the SDK talks to AWS.
  */
 export type AwsEnv = Record<string, string | undefined> & {
@@ -21,9 +21,6 @@ export function cognitoClient(env: AwsEnv = process.env): CognitoIdentityProvide
 export function sqsClient(env: AwsEnv = process.env): SQSClient {
   return new SQSClient({
     region: env.AWS_REGION ?? 'us-east-1',
-    ...(env.SQS_ENDPOINT
-      ? // ElasticMQ returns queue URLs with its own host name; keep using the configured endpoint.
-        { endpoint: env.SQS_ENDPOINT, useQueueUrlAsEndpoint: false }
-      : {}),
+    ...(env.SQS_ENDPOINT ? { endpoint: env.SQS_ENDPOINT } : {}),
   })
 }
