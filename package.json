@@ -17,7 +17,8 @@
     "seed:reset": "pnpm --filter @nexo/scripts seed:reset",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "secrets:scan": "./scripts/scan-secrets.sh"
+    "secrets:scan": "./scripts/scan-secrets.sh",
+    "token": "pnpm --filter @nexo/scripts -s token"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",
