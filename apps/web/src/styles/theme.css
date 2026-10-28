@@ -1,0 +1,78 @@
+/* Design tokens extracted from the prototype exports. Tailwind v4 CSS-first config. */
+@theme {
+  /* Fonts: set --font-sans / --font-serif vars via next/font (Schibsted Grotesk, Newsreader). */
+  --font-sans: var(--font-schibsted), 'Schibsted Grotesk', system-ui, sans-serif;
+  --font-serif: var(--font-newsreader), 'Newsreader', system-ui, serif;
+
+  /* Text: ink = main text, ink-soft = secondary (nav inactive, body), ink-muted = captions/meta. */
+  --color-ink: #1b2431;
+  --color-ink-soft: #3d4656;
+  --color-ink-muted: #5b6472;
+
+  /* Navy: login showcase panel, employee chat bubble. */
+  --color-navy-900: #1b2431;
+
+  /* Primary blue: 50 = selected/active tint (#0285f7 @ 7%), 500 = accent dots, 600 = buttons/badges, 700 = link/active text. */
+  --color-primary-50: #0285f712;
+  --color-primary-100: #e6effa;
+  --color-primary-200: #dce9f7;
+  --color-primary-500: #0285f7;
+  --color-primary-600: #0062c4;
+  --color-primary-700: #0069c7;
+  --color-primary-hover: #037af6;
+
+  /* Warning (amber): pending / waiting for analyst / overdue-ish status. */
+  --color-warning-500: #f5a500;
+  --color-warning-700: #946300;
+  --color-warning-bg: #fbefd0;
+  --color-warning-ink: #8a6100;
+
+  /* Success (green): online dot, resolved, analyst availability, analyst tag. */
+  --color-success-500: #00bd6c;
+  --color-success-700: #00804a;
+  --color-success-50: #00bd6c14;
+
+  /* Danger (red): critical, end conversation. */
+  --color-danger-500: #ee343b;
+  --color-danger-700: #c4161d;
+  --color-danger-50: #ee343b12;
+
+  /* Surfaces and borders. */
+  --color-surface: #ffffff;
+  --color-surface-muted: #f6f7f9; /* rails, inputs, card footers, inactive filter tabs */
+  --color-surface-canvas: #eef1f5; /* analyst conversation background */
+  --color-border: #e6e8ec; /* dividers, agent bubble, inactive chips */
+  --color-border-strong: #1b24311f; /* outlined buttons and inputs */
+  --color-border-card: #1b243117; /* card outline */
+
+  /* Chat bubbles. Chat: employee dark, agent white + border. Console: employee white, agent light blue, analyst light green. */
+  --color-bubble-employee: #1b2431;
+  --color-bubble-agent: #e6effa;
+  --color-bubble-analyst: #e3f4ea;
+
+  /* Avatar tints (bg / initials), rotated by employee. */
+  --color-avatar-blue: #dce9f7;
+  --color-avatar-orange: #f6e3d3;
+  --color-avatar-orange-ink: #9a4a12;
+  --color-avatar-violet: #e6e1f7;
+  --color-avatar-violet-ink: #5b3fc4;
+  --color-avatar-green: #ddf0e6;
+  --color-avatar-green-ink: #1e7a4c;
+  --color-avatar-rose: #f7e1e6;
+  --color-avatar-rose-ink: #a3324f;
+  --color-avatar-gray: #e5e8ec;
+  --color-avatar-amber: #fbefd0;
+
+  /* Radius: sm = kbd/badge/send, md = buttons/chips/inputs, lg = composer/list rows/bubbles, xl = cards. */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+
+  /* Shadows: card = ticket/draft cards, bubble = console bubbles, button = outlined buttons, cta = primary login button. */
+  --shadow-card: 0 1px 2px #1b24310d, 0 6px 18px #1b24310a;
+  --shadow-bubble: 0 1px 2px #1b243112;
+  --shadow-button: 0 1px 2px #1b24310d;
+  --shadow-cta: 0 1px 2px #0062c433, 0 6px 16px #0062c426;
+}
