@@ -83,6 +83,14 @@ Environments:
 - Every key goes in `.env`, which is gitignored. `.env.example` lists all the variables. No secret ever goes in the code or the image.
 - Document a fast dev loop in the README as well (`pnpm dev` against the dockerized mongo, Cognito, and SQS emulators).
 
+## Commands (for working sessions)
+
+- Checks: `pnpm lint && pnpm format:check && pnpm typecheck && pnpm test` (unit, no Docker); with the stack up: `pnpm test:integration` (`INTEGRATION_RESTARTS=1` for the restart test) and `pnpm smoke`. Do not use `pnpm -s` for checks: it hides failures.
+- Real-model evals (never in CI): `source scripts/env-from-keychain.sh && pnpm test:evals`.
+- Chat as a seeded user through the real API: `pnpm chat ana --nova -m "..." [-m /confirmar]`. Access token for curl: `pnpm --silent dev:token ana`.
+- Refresh seed dates: `docker compose run --rm init pnpm --filter @nexo/scripts seed:reset`. Force a ticket-system outage: `curl -X POST "localhost:4000/_chaos/outage?ms=25000"`.
+- Never run `docker compose down -v` while another session uses the stack. Parallel sessions work in a git worktree on their own branch; the main session merges.
+
 ## Quality bar (from the evaluation table)
 
 - Decision quality: a scenario test suite with fixtures. Each scenario is an employee message plus the expected intent and action: a KB question, a ticket lookup without the ticket number, an overdue ticket, a duplicate, a reopen within 7 days, an out-of-scope topic, a critical incident, an explicit request for an analyst, and low confidence. Run it with a real model behind a flag, and also with a mocked model in CI.
