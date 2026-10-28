@@ -1,17 +1,18 @@
 # Local stack: `docker compose up --build`
-# Everything runs without an AWS account: cognito-local emulates Cognito, ElasticMQ emulates SQS.
+# Everything runs without an AWS account: Floci emulates Cognito and SQS behind one endpoint.
 name: nexo-assist
 
 x-aws-local: &aws-local
   AWS_REGION: us-east-1
   AWS_ACCESS_KEY_ID: local
   AWS_SECRET_ACCESS_KEY: local
-  COGNITO_ENDPOINT: http://cognito:9229
+  COGNITO_ENDPOINT: http://floci:4566
   COGNITO_USER_POOL_NAME: nexo-assist
-  # Issuer is fixed by docker/cognito/config.json; JWKS is fetched over the compose network.
-  COGNITO_ISSUER_DOMAIN: http://localhost:9229
-  COGNITO_JWKS_DOMAIN: http://cognito:9229
-  SQS_ENDPOINT: http://elasticmq:9324
+  # Floci signs `iss` with its FLOCI_BASE_URL (set below), whatever host the request came in on.
+  # The JWKS is fetched over the compose network.
+  COGNITO_ISSUER_DOMAIN: http://localhost:4566
+  COGNITO_JWKS_DOMAIN: http://floci:4566
+  SQS_ENDPOINT: http://floci:4566
   MONGODB_URI: mongodb://mongo:27017/?replicaSet=rs0
 
 services:
@@ -26,23 +27,17 @@ services:
       timeout: 5s
       retries: 20
 
-  cognito:
-    image: jagregory/cognito-local:5.3.0
-    ports: ['9229:9229']
-    # cognito-local rewrites its config file on start, so copy ours in instead of bind-mounting it.
-    entrypoint: ['sh', '-c', 'cp /config/config.json /app/.cognito/config.json && exec node /app/start.js']
-    volumes:
-      - cognito-data:/app/.cognito
-      - ./docker/cognito/config.json:/config/config.json:ro
+  # One endpoint for Cognito and SQS. Persistent storage keeps the user pool, users and queued messages.
+  floci:
+    image: floci/floci:2.3.0
+    ports: ['4566:4566']
+    environment:
+      FLOCI_STORAGE_MODE: persistent
+      FLOCI_STORAGE_PERSISTENT_PATH: /app/data
+      FLOCI_BASE_URL: http://localhost:4566
+    volumes: ['floci-data:/app/data']
 
-  elasticmq:
-    image: softwaremill/elasticmq-native:1.7.1
-    ports: ['9324:9324']
-    volumes:
-      - elasticmq-data:/data
-      - ./docker/elasticmq/elasticmq.conf:/opt/elasticmq.conf:ro
-
-  # One-shot: replica set, Cognito pool/groups/users, seed data relative to "now". Idempotent.
+  # One-shot: replica set, Cognito pool/groups/users, SQS queues, seed data relative to "now". Idempotent.
   init:
     build: { context: ., dockerfile: docker/scripts.Dockerfile }
     command: ['pnpm', '--filter', '@nexo/scripts', 'init:local']
@@ -53,8 +48,7 @@ services:
       SEED_PASSWORD: ${SEED_PASSWORD:-nexo123}
     depends_on:
       mongo: { condition: service_healthy }
-      cognito: { condition: service_started }
-      elasticmq: { condition: service_started }
+      floci: { condition: service_healthy }
     restart: 'no'
 
   tickets:
@@ -97,5 +91,4 @@ services:
 
 volumes:
   mongo-data:
-  cognito-data:
-  elasticmq-data:
+  floci-data:
