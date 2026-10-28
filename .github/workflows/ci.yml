@@ -52,6 +52,19 @@ jobs:
         env:
           # Fresh stack owned by this job, so tests that restart containers are safe here.
           INTEGRATION_RESTARTS: '1'
+      - name: Install Chromium for the browser e2e tests
+        run: pnpm --filter @nexo/tests exec playwright install --with-deps chromium
+      - name: Browser e2e tests (web from next dev with the scripted model, no LLM key)
+        run: |
+          cp .env.example .env
+          pnpm test:e2e
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: tests/playwright-report
+          if-no-files-found: ignore
       - name: Compose logs
         if: failure()
         run: docker compose logs --no-color --timestamps
