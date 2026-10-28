@@ -21,6 +21,9 @@ export const ASSIST_COLLECTIONS = {
   messages: 'messages',
   drafts: 'drafts',
   counters: 'counters',
+  /** Agent-turn counters for the LLM caps (per user per day, global per minute and per day). */
   llmUsage: 'llm_usage',
+  /** Request counters for rate limiting (login, chat). */
+  rateLimits: 'rate_limits',
   meta: 'meta',
 } as const
