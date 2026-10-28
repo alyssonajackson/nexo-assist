@@ -76,17 +76,23 @@ export function slaDueAt(priority: Priority, from: Date): Date {
 }
 
 /**
- * The SLA clock starts at creation and restarts at each update from support.
+ * The SLA clock starts at creation and restarts at each update from support and at each reopen.
  * Employee updates do not restart it (otherwise adding a comment would hide an overdue ticket).
  */
-export function slaClockStart(ticket: Pick<Ticket, 'createdAt' | 'lastSupportUpdateAt'>): Date {
-  return ticket.lastSupportUpdateAt ?? ticket.createdAt
+export function slaClockStart(
+  ticket: Pick<Ticket, 'createdAt' | 'lastSupportUpdateAt' | 'reopenedAt'>,
+): Date {
+  const candidates = [ticket.createdAt, ticket.lastSupportUpdateAt, ticket.reopenedAt]
+  return new Date(Math.max(...candidates.filter((d): d is Date => d !== undefined).map((d) => d.getTime())))
 }
 
 export type SlaStatus = { dueAt: Date | null; overdue: boolean; reopenable: boolean }
 
 export function slaStatus(
-  ticket: Pick<Ticket, 'status' | 'priority' | 'createdAt' | 'lastSupportUpdateAt' | 'resolvedAt'>,
+  ticket: Pick<
+    Ticket,
+    'status' | 'priority' | 'createdAt' | 'lastSupportUpdateAt' | 'reopenedAt' | 'resolvedAt'
+  >,
   now: Date,
 ): SlaStatus {
   if (!isOpenStatus(ticket.status)) {

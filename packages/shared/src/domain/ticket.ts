@@ -103,6 +103,8 @@ export const Ticket = z.object({
   /** Last time support (an analyst) responded or updated the ticket. Restarts the SLA clock. */
   lastSupportUpdateAt: z.coerce.date().optional(),
   resolvedAt: z.coerce.date().optional(),
+  /** Last reopen. Restarts the SLA clock like a new ticket. */
+  reopenedAt: z.coerce.date().optional(),
   timeline: z.array(TimelineEntry),
 })
 export type Ticket = z.infer<typeof Ticket>

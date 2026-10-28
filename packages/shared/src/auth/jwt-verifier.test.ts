@@ -34,7 +34,7 @@ describe('createJwtVerifier', () => {
   it('returns the user id, e-mail and role from a valid access token', async () => {
     await expect(verify(await sign(accessClaims()))).resolves.toEqual({
       userId: 'user-1',
-      email: 'ana.souza@nexo.com.br',
+      username: 'ana.souza@nexo.com.br',
       role: 'employee',
     })
   })

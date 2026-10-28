@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { Category, KbArticle, NewTicketInput, TicketView } from './domain/ticket'
+import { KbArticle, NewTicketInput, TicketView } from './domain/ticket'
 
 /** HTTP contract of services/tickets, shared by the service and its client. */
 
@@ -14,7 +14,6 @@ export type ListTicketsQuery = z.input<typeof ListTicketsQuery>
 
 export const DuplicatesQuery = z.object({
   text: z.string().min(3),
-  category: Category.optional(),
 })
 export type DuplicatesQuery = z.infer<typeof DuplicatesQuery>
 

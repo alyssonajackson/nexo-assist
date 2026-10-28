@@ -99,3 +99,20 @@ describe('isReopenable', () => {
     expect(isReopenable({ status: 'closed', resolvedAt: sp('2026-10-27T10:00:00') }, now)).toBe(false)
   })
 })
+
+describe('slaClockStart', () => {
+  it('restarts the clock when a resolved ticket is reopened', () => {
+    const s = slaStatus(
+      {
+        status: 'open',
+        priority: 'medium',
+        createdAt: sp('2026-10-01T09:00:00'),
+        lastSupportUpdateAt: sp('2026-10-10T09:00:00'),
+        reopenedAt: sp('2026-10-28T09:00:00'),
+      },
+      sp('2026-10-28T10:00:00'),
+    )
+    expect(s.overdue).toBe(false)
+    expect(s.dueAt).toEqual(sp('2026-11-02T09:00:00'))
+  })
+})

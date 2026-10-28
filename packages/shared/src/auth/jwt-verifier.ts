@@ -29,8 +29,7 @@ export function createJwtVerifier(config: JwtVerifierConfig) {
       const groups = Array.isArray(payload['cognito:groups']) ? payload['cognito:groups'].map(String) : []
       return {
         userId: payload.sub,
-        // Cognito puts the username in access tokens; our usernames are the corporate e-mails.
-        email: typeof payload.username === 'string' ? payload.username : '',
+        username: typeof payload.username === 'string' ? payload.username : '',
         role: roleFromGroups(groups),
       }
     } catch (err) {

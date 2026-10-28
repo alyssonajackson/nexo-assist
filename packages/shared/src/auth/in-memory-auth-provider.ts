@@ -34,7 +34,7 @@ export class InMemoryAuthProvider implements AuthProvider {
   }
 
   private issue(user: FakeUser): AuthTokens {
-    const authUser: AuthUser = { userId: user.userId, email: user.email, role: user.role }
+    const authUser: AuthUser = { userId: user.userId, username: user.email, role: user.role }
     const accessToken = crypto.randomUUID()
     const refreshToken = crypto.randomUUID()
     this.sessions.set(accessToken, authUser)

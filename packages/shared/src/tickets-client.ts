@@ -1,5 +1,5 @@
 import type { z } from 'zod'
-import type { Category, KbArticle, TicketView } from './domain/ticket'
+import type { KbArticle, TicketView } from './domain/ticket'
 import { RetryExhaustedError, withRetry, DEFAULT_RETRY, type RetryOptions } from './retry'
 import {
   DuplicatesResponse,
@@ -115,8 +115,8 @@ export function createTicketsClient(opts: TicketsClientOptions) {
     async getTicket(id: string): Promise<TicketView> {
       return (await call(TicketResponse, `/tickets/${encodeURIComponent(id)}`)).ticket
     },
-    async findDuplicates(text: string, category?: Category): Promise<DuplicateCandidate[]> {
-      return (await call(DuplicatesResponse, `/tickets/duplicates${qs({ text, category })}`)).candidates
+    async findDuplicates(text: string): Promise<DuplicateCandidate[]> {
+      return (await call(DuplicatesResponse, `/tickets/duplicates${qs({ text })}`)).candidates
     },
     async searchKb(q: string): Promise<(KbArticle & { score: number })[]> {
       return (await call(KbSearchResponse, `/kb/search${qs({ q })}`)).articles

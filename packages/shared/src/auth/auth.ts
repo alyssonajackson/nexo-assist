@@ -4,7 +4,8 @@ import { Role } from '../domain/conversation'
 /** Who is calling, as proven by a verified token. Never taken from the request body or the prompt. */
 export const AuthUser = z.object({
   userId: z.string(),
-  email: z.string(),
+  /** Cognito username: the e-mail on AWS; cognito-local puts the sub here. Display only. */
+  username: z.string(),
   role: Role,
 })
 export type AuthUser = z.infer<typeof AuthUser>
