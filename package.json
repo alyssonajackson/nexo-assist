@@ -21,7 +21,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "secrets:scan": "./scripts/scan-secrets.sh",
-    "token": "pnpm --filter @nexo/scripts -s token"
+    "token": "pnpm --filter @nexo/scripts -s token",
+    "chat": "pnpm --filter @nexo/scripts -s chat"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",
