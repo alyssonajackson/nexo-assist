@@ -1,0 +1,93 @@
+# Local stack: `docker compose up --build`
+# Everything runs without an AWS account: cognito-local emulates Cognito, ElasticMQ emulates SQS.
+name: nexo-assist
+
+x-aws-local: &aws-local
+  AWS_REGION: us-east-1
+  AWS_ACCESS_KEY_ID: local
+  AWS_SECRET_ACCESS_KEY: local
+  COGNITO_ENDPOINT: http://cognito:9229
+  COGNITO_USER_POOL_NAME: nexo-assist
+  # Issuer is fixed by docker/cognito/config.json; JWKS is fetched over the compose network.
+  COGNITO_ISSUER_DOMAIN: http://localhost:9229
+  COGNITO_JWKS_DOMAIN: http://cognito:9229
+  SQS_ENDPOINT: http://elasticmq:9324
+  MONGODB_URI: mongodb://mongo:27017/?replicaSet=rs0
+
+services:
+  mongo:
+    image: mongo:8.0
+    command: ['--replSet', 'rs0', '--bind_ip_all']
+    ports: ['27017:27017']
+    volumes: ['mongo-data:/data/db']
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  cognito:
+    image: jagregory/cognito-local:5.3.0
+    ports: ['9229:9229']
+    volumes:
+      - cognito-data:/app/.cognito
+      - ./docker/cognito/config.json:/app/.cognito/config.json
+
+  elasticmq:
+    image: softwaremill/elasticmq-native:1.7.1
+    ports: ['9324:9324']
+    volumes:
+      - elasticmq-data:/data
+      - ./docker/elasticmq/elasticmq.conf:/opt/elasticmq.conf:ro
+
+  # One-shot: replica set, Cognito pool/groups/users, seed data relative to "now". Idempotent.
+  init:
+    build: { context: ., dockerfile: docker/scripts.Dockerfile }
+    command: ['pnpm', '--filter', '@nexo/scripts', 'init:local']
+    environment:
+      <<: *aws-local
+      MONGODB_URI: mongodb://mongo:27017/?directConnection=true
+      MONGO_REPLICA_HOST: mongo:27017
+      SEED_PASSWORD: ${SEED_PASSWORD:-nexo123}
+    depends_on:
+      mongo: { condition: service_healthy }
+      cognito: { condition: service_started }
+      elasticmq: { condition: service_started }
+    restart: 'no'
+
+  tickets:
+    build: { context: ., dockerfile: docker/tickets.Dockerfile }
+    ports: ['4000:4000']
+    env_file: [{ path: .env, required: false }]
+    environment:
+      <<: *aws-local
+      PORT: 4000
+    depends_on:
+      init: { condition: service_completed_successfully }
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:4000/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  web:
+    build: { context: ., dockerfile: docker/web.Dockerfile }
+    ports: ['3000:3000']
+    env_file: [{ path: .env, required: false }]
+    environment:
+      <<: *aws-local
+      TICKETS_URL: http://tickets:4000
+    depends_on:
+      init: { condition: service_completed_successfully }
+      tickets: { condition: service_healthy }
+
+volumes:
+  mongo-data:
+  cognito-data:
+  elasticmq-data:
