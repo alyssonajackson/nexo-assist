@@ -37,6 +37,8 @@ describe(`decision scenarios (${model})`, () => {
       tools: r.result.decision.toolsCalled.map((c) => (c.ok ? c.tool : `${c.tool}!`)).join(' '),
       rules: r.result.decision.ruleOverrides.map((o) => o.rule).join(' '),
       ms: r.result.decision.latencyMs,
+      tokensIn: r.result.decision.usage?.inputTokens,
+      tokensOut: r.result.decision.usage?.outputTokens,
       failures:
         r.failures.join('; ') + (r.result.decision.source === 'code' ? ` [${r.result.decision.reason}]` : ''),
     }))
