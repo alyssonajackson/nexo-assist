@@ -151,5 +151,7 @@ export const Decision = ModelDecision.extend({
   source: z.enum(['model', 'code']),
   model: z.string().optional(),
   latencyMs: z.number().int().nonnegative().optional(),
+  /** Tokens of the whole turn (every model step), for the cost estimate. */
+  usage: z.object({ inputTokens: z.number().int(), outputTokens: z.number().int() }).optional(),
 })
 export type Decision = z.infer<typeof Decision>

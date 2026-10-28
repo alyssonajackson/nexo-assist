@@ -39,6 +39,7 @@ export type TurnResult = {
 }
 
 const MAX_STEPS = 6
+const MAX_ATTEMPTS = 2
 const FORCE_FIRST_TOOL = process.env.AGENT_FORCE_FIRST_TOOL !== '0'
 
 export const FAILURE_REPLY =
@@ -51,24 +52,44 @@ export const FAILURE_REPLY =
 export async function runTurn(input: TurnInput): Promise<TurnResult> {
   const started = Date.now()
   const emit = input.onEvent ?? (() => {})
-  const recorder = new TurnRecorder((call) => emit({ type: 'tool', call }))
-  const turn: TurnContext = {
-    user: input.user,
-    conversationId: input.conversationId,
-    now: input.now ?? new Date(),
-    ports: input.ports,
-    recorder,
+  const now = input.now ?? new Date()
+  // A fresh recorder per attempt, so a retried turn does not show the failed attempt's chips twice.
+  const prepare = () => {
+    const recorder = new TurnRecorder((call) => emit({ type: 'tool', call }))
+    const turn: TurnContext = {
+      user: input.user,
+      conversationId: input.conversationId,
+      now,
+      ports: input.ports,
+      recorder,
+    }
+    const requestContext = new RequestContext()
+    requestContext.set(TURN_KEY, turn)
+    return { recorder, requestContext }
   }
-  const requestContext = new RequestContext()
-  requestContext.set(TURN_KEY, turn)
 
+  let attempt = prepare()
+  let recorder = attempt.recorder
   let output: AgentOutput
-  try {
-    output = await streamModel(input, requestContext, emit)
-  } catch (err) {
-    console.error('agent: model turn failed', err)
-    for (const d of recorder.effects.drafts) await input.ports.drafts.cancel(d.id)
-    return failedTurn(recorder, input.modelId, Date.now() - started, err)
+  let usage: Decision['usage']
+  for (let n = 1; ; n++) {
+    try {
+      ;({ output, usage } = await streamModel(input, attempt.requestContext, emit))
+      break
+    } catch (err) {
+      // Provider hiccups (e.g. Gemini's MALFORMED_FUNCTION_CALL) are retried once, but only when the
+      // failed attempt changed nothing (no draft, no transfer): reads are safe to repeat.
+      const fx = recorder.effects
+      if (n < MAX_ATTEMPTS && !fx.drafts.length && !fx.transfer) {
+        console.warn('agent: model turn failed, retrying once', err instanceof Error ? err.message : err)
+        attempt = prepare()
+        recorder = attempt.recorder
+        continue
+      }
+      console.error('agent: model turn failed', err)
+      for (const d of fx.drafts) await input.ports.drafts.cancel(d.id)
+      return failedTurn(recorder, input.modelId, Date.now() - started, err)
+    }
   }
 
   const model = toModelDecision(output)
@@ -102,6 +123,7 @@ export async function runTurn(input: TurnInput): Promise<TurnResult> {
     source: 'model',
     model: input.modelId,
     latencyMs: Date.now() - started,
+    ...(usage ? { usage } : {}),
   }
   return {
     reply: policy.reply,
@@ -115,7 +137,7 @@ async function streamModel(
   input: TurnInput,
   requestContext: RequestContext,
   emit: (e: TurnEvent) => void,
-): Promise<AgentOutput> {
+): Promise<{ output: AgentOutput; usage: Decision['usage'] }> {
   const stream = await input.agent.stream(toModelMessages(input.history, input.text), {
     requestContext,
     maxSteps: MAX_STEPS,
@@ -149,11 +171,15 @@ async function streamModel(
       replyLength = reply.length
     }
   }
+  const total = await stream.totalUsage.catch(() => undefined)
+  const usage = total
+    ? { inputTokens: total.inputTokens ?? 0, outputTokens: total.outputTokens ?? 0 }
+    : undefined
   try {
-    return AgentOutput.parse(await stream.object)
+    return { output: AgentOutput.parse(await stream.object), usage }
   } catch (err) {
     const repaired = repairOutput(rawOutput(err))
-    if (repaired) return repaired
+    if (repaired) return { output: repaired, usage }
     throw err
   }
 }
