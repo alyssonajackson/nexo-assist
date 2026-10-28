@@ -19,6 +19,10 @@ services:
   mongo:
     image: mongo:8.0
     command: ['--replSet', 'rs0', '--bind_ip_all']
+    # MongoDB 8.x refuses to start on Linux kernels 6.19+ (SERVER-121912, e.g. GitHub runners).
+    # This keeps TCMalloc off the broken rseq path (per-thread instead of per-CPU caches).
+    environment:
+      GLIBC_TUNABLES: glibc.pthread.rseq=1
     ports: ['27017:27017']
     volumes: ['mongo-data:/data/db']
     healthcheck:
