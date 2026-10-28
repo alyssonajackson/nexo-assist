@@ -1,5 +1,5 @@
 import 'server-only'
-import { ObjectId } from 'mongodb'
+import { ObjectId, type Filter } from 'mongodb'
 import { MAX_EMPLOYEE_MESSAGES, type Conversation, type ConversationState } from '@nexo/shared'
 import { assistDb, type ConversationDoc } from '../db'
 import { toConversation } from './docs'
@@ -71,11 +71,13 @@ export async function transition(
   to: ConversationState,
   set: Partial<Omit<ConversationDoc, '_id' | 'state'>> = {},
   unset: (keyof ConversationDoc)[] = [],
+  /** Extra guard in the same atomic filter, e.g. only the assigned analyst. */
+  guard: Filter<ConversationDoc> = {},
 ): Promise<Conversation | null> {
   const doc = await (
     await assistDb()
   ).conversations.findOneAndUpdate(
-    { _id: id, state: { $in: from } },
+    { _id: id, state: { $in: from }, ...guard },
     {
       $set: { ...set, state: to },
       ...(unset.length ? { $unset: Object.fromEntries(unset.map((k) => [k, ''])) } : {}),

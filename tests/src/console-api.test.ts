@@ -186,6 +186,24 @@ describe('handoff transitions', () => {
     expect((await post(`/conversations/${id}/take-over`, rafael)).status).toBe(409)
   })
 
+  it('lets only the assigned analyst give back or close while the state is analyst', async () => {
+    const id = await insertWaiting()
+    await conversations().updateOne(
+      { _id: id },
+      { $set: { state: 'analyst', assignedAnalystId: 'someone-else' } },
+    )
+    expect((await post(`/conversations/${id}/give-back`, rafael)).status).toBe(409)
+    expect((await post(`/conversations/${id}/close`, rafael)).status).toBe(409)
+    expect(await conversations().findOne({ _id: id })).toMatchObject({
+      state: 'analyst',
+      assignedAnalystId: 'someone-else',
+    })
+    expect(await messages().countDocuments({ conversationId: id, role: 'system' })).toBe(0)
+
+    await conversations().updateOne({ _id: id }, { $set: { assignedAnalystId: rafael.userId } })
+    expect((await post(`/conversations/${id}/give-back`, rafael)).status).toBe(200)
+  })
+
   it("records the handoff on the ticket's timeline through the handoff-events queue", async () => {
     const id = await insertWaiting()
     expect((await post(`/conversations/${id}/take-over`, rafael)).status).toBe(200)
