@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { AlertCircle, Headset, MessageSquarePlus, RotateCcw } from 'lucide-react'
+import { AlertCircle, Clock, Headset, MessageSquarePlus, RotateCcw } from 'lucide-react'
 
 type Tone = 'info' | 'warning' | 'danger'
 
@@ -42,6 +42,21 @@ export function ErrorNotice({
           Entrar novamente
         </a>
       )}
+      {onRetry && (
+        <button type="button" onClick={onRetry} className={actionClass}>
+          <RotateCcw className="size-3.5" aria-hidden="true" />
+          Tentar novamente
+        </button>
+      )}
+    </Notice>
+  )
+}
+
+/** A limit of the public demo was hit (LLM caps, rate limit). The message says when to come back. */
+export function QuotaNotice({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  return (
+    <Notice tone="warning" icon={<Clock className="size-4 shrink-0" aria-hidden="true" />}>
+      <span className="flex-1">{message}</span>
       {onRetry && (
         <button type="button" onClick={onRetry} className={actionClass}>
           <RotateCcw className="size-3.5" aria-hidden="true" />

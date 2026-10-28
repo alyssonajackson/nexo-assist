@@ -18,6 +18,7 @@ import {
   latestAgentMessageId,
   limitReached,
   pickedOption,
+  quotaHit,
   shouldPoll,
   type ChatAction,
   type ChatRequestKind,
@@ -290,15 +291,20 @@ describe('stream events', () => {
       )
       expect(state.error).not.toHaveProperty('unsentText')
     })
-    it.each(['message_limit', 'closed', 'not_pending', 'not_found', 'unauthorized'])(
-      'has no retry for the final code %s',
-      (code) => {
-        const state = run(running(confirmRequest), ev({ type: 'error', error: code, message: 'm' }))
-        expect(state.turn).toBeNull()
-        expect(state.error).toEqual({ code, message: 'm' })
-        expect(state.error).not.toHaveProperty('retry')
-      },
-    )
+    it.each([
+      'message_limit',
+      'closed',
+      'not_pending',
+      'not_found',
+      'unauthorized',
+      'llm_user_daily_cap',
+      'llm_daily_cap',
+    ])('has no retry for the final code %s', (code) => {
+      const state = run(running(confirmRequest), ev({ type: 'error', error: code, message: 'm' }))
+      expect(state.turn).toBeNull()
+      expect(state.error).toEqual({ code, message: 'm' })
+      expect(state.error).not.toHaveProperty('retry')
+    })
     it('has no retry when no turn was running', () => {
       const state = run(empty(), ev({ type: 'error', error: 'llm_failed', message: 'm' }))
       expect(state.error).not.toHaveProperty('retry')
@@ -388,6 +394,21 @@ describe('selectors', () => {
     })
     it('is false without a conversation', () => {
       expect(limitReached(initialState(null))).toBe(false)
+    })
+  })
+
+  describe('quotaHit', () => {
+    it('is true for the demo limits, which keep the composer usable', () => {
+      const busy = run(running(), ev({ type: 'error', error: 'llm_busy', message: 'm' }))
+      expect(quotaHit(busy)).toBe(true)
+      expect(busy.error?.retry).toBeDefined()
+      expect(limitReached(busy) || isClosed(busy)).toBe(false)
+      const daily = run(running(), ev({ type: 'error', error: 'llm_daily_cap', message: 'm' }))
+      expect(quotaHit(daily)).toBe(true)
+      expect(daily.error).not.toHaveProperty('retry')
+    })
+    it('is false for other errors', () => {
+      expect(quotaHit(run(running(), ev({ type: 'error', error: 'internal', message: 'm' })))).toBe(false)
     })
   })
 

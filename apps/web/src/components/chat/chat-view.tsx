@@ -1,12 +1,12 @@
 'use client'
 
 import { useEffect } from 'react'
-import { isClosed, isTurnRunning, limitReached, messageCount } from '@/lib/chat/chat-state'
+import { isClosed, isTurnRunning, limitReached, messageCount, quotaHit } from '@/lib/chat/chat-state'
 import { useChatContext } from './chat-provider'
 import { Composer } from './composer'
 import { EmptyState } from './empty-state'
 import { MessageList } from './message-list'
-import { ErrorNotice, HandoffNotice, LimitNotice } from './notices'
+import { ErrorNotice, HandoffNotice, LimitNotice, QuotaNotice } from './notices'
 import { useStickToBottom } from './use-stick-to-bottom'
 
 /** Screens 2 and 3: the message column, the banners and the composer. */
@@ -48,7 +48,13 @@ export function ChatView() {
           {(conversationState === 'waiting_analyst' || conversationState === 'analyst') && (
             <HandoffNotice state={conversationState} />
           )}
-          {state.error && !limit && !closed && (
+          {state.error && quotaHit(state) && (
+            <QuotaNotice
+              message={state.error.message}
+              {...(state.error.retry ? { onRetry: chat.retry } : {})}
+            />
+          )}
+          {state.error && !quotaHit(state) && !limit && !closed && (
             <ErrorNotice
               message={state.error.message}
               signedOut={state.error.code === 'unauthorized'}

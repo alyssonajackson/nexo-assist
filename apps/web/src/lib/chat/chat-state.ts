@@ -64,7 +64,16 @@ export type ChatAction =
   | { type: 'error_dismissed' }
 
 /** Errors where repeating the same request cannot help. */
-const FINAL_ERRORS = new Set(['message_limit', 'closed', 'not_pending', 'not_found', 'unauthorized'])
+const FINAL_ERRORS = new Set([
+  'message_limit',
+  'closed',
+  'not_pending',
+  'not_found',
+  'unauthorized',
+  // LLM caps of the demo: trying again today does not help (llm_busy and rate_limited can be retried).
+  'llm_user_daily_cap',
+  'llm_daily_cap',
+])
 
 const byId = <T extends { id: string }>(items: T[]): Record<string, T> =>
   Object.fromEntries(items.map((i) => [i.id, i]))
@@ -175,6 +184,10 @@ export const limitReached = (state: ChatState): boolean =>
 /** The conversation is with an analyst (or waiting for one): the agent stays silent. */
 export const isHandedOff = (state: ChatState): boolean =>
   state.conversation?.state === 'waiting_analyst' || state.conversation?.state === 'analyst'
+
+/** A demo limit refused the message (LLM caps, rate limit): shown as a notice, not as a failure. */
+const QUOTA_ERRORS = new Set(['llm_user_daily_cap', 'llm_daily_cap', 'llm_busy', 'rate_limited'])
+export const quotaHit = (state: ChatState): boolean => QUOTA_ERRORS.has(state.error?.code ?? '')
 
 export const isClosed = (state: ChatState): boolean =>
   state.conversation?.state === 'closed' || state.error?.code === 'closed'
