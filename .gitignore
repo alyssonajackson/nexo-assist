@@ -22,3 +22,6 @@ next-env.d.ts
 .gstack/
 .evals/
 packages/agent/.scratch/
+test-results/
+playwright-report/
+.next-e2e/

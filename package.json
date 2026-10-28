@@ -22,7 +22,8 @@
     "format:check": "prettier --check .",
     "secrets:scan": "./scripts/scan-secrets.sh",
     "dev:token": "pnpm --filter @nexo/scripts --silent dev:token",
-    "chat": "pnpm --filter @nexo/scripts -s chat"
+    "chat": "pnpm --filter @nexo/scripts -s chat",
+    "test:e2e": "pnpm --filter @nexo/tests test:e2e"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",

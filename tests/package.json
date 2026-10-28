@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "test:integration": "vitest run",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.1158.0",
@@ -13,5 +14,8 @@
     "@nexo/shared": "workspace:*",
     "jose": "^6.2.13",
     "mongodb": "^7.7.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1"
   }
 }
