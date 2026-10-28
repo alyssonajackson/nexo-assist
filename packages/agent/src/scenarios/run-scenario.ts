@@ -60,6 +60,8 @@ function check(s: Scenario, r: TurnResult, o: ScenarioOutcome, scriptRules: bool
   if (!e.action.includes(d.action)) fail(`action ${d.action}, esperava ${e.action.join('|')}`)
   for (const t of e.tools ?? []) if (!calls(true).has(t)) fail(`não chamou ${t}`)
   for (const t of e.refusedTools ?? []) if (!calls(false).has(t)) fail(`${t} deveria ter sido recusado`)
+  const allowed: string[] | undefined = e.onlyTools
+  for (const c of d.toolsCalled) if (allowed && !allowed.includes(c.tool)) fail(`não podia chamar ${c.tool}`)
   for (const rule of [...(e.rules ?? []), ...(scriptRules ? (s.scriptRules ?? []) : [])]) {
     if (!rules.has(rule)) fail(`regra ${rule} não aplicada`)
   }
