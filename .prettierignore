@@ -10,3 +10,4 @@ AGENTS.md
 .agents
 .claude
 .codex
+infra/.terraform/

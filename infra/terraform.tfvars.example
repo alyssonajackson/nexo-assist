@@ -1,0 +1,4 @@
+# Copy to terraform.tfvars (gitignored).
+budget_email = "you@example.com"
+# budget_limit_usd = 5
+# region           = "us-east-1"
