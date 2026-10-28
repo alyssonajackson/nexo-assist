@@ -15,6 +15,8 @@ export type TurnEffects = {
   /** How they were shown: a list, or a single ticket card. */
   shownAs?: 'list' | 'single'
   overdueTicketIds: string[]
+  /** Shown tickets resolved within the reopen window (sla.reopenable, computed by the tickets service). */
+  reopenableTicketIds: string[]
   kbArticleIds: string[]
   /** Drafts proposed this turn (the last one is the live one). */
   drafts: Draft[]
@@ -34,6 +36,7 @@ export class TurnRecorder {
   readonly effects: TurnEffects = {
     shownTicketIds: [],
     overdueTicketIds: [],
+    reopenableTicketIds: [],
     kbArticleIds: [],
     drafts: [],
     refusals: [],

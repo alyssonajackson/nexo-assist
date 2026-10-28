@@ -14,6 +14,7 @@ import type { TurnEffects } from './recorder'
 const effects = (fx: Partial<TurnEffects> = {}): TurnEffects => ({
   shownTicketIds: [],
   overdueTicketIds: [],
+  reopenableTicketIds: [],
   kbArticleIds: [],
   drafts: [],
   refusals: [],
@@ -200,6 +201,62 @@ describe('applyPolicy', () => {
       { shownTicketIds: ['INC-20311'], overdueTicketIds: ['INC-20311'] },
     )
     expect(r.overrides).toEqual([])
+  })
+
+  describe('reopen within the window', () => {
+    const back = { employeeMessage: 'A senha do SAP bloqueou de novo, é o mesmo problema do inc-20150.' }
+    const shown: Partial<TurnEffects> = {
+      shownTicketIds: ['INC-20150'],
+      shownAs: 'single',
+      reopenableTicketIds: ['INC-20150'],
+    }
+
+    it('proposes the reopen when the model only asked about a named, reopenable ticket', () => {
+      const r = run(
+        { intent: 'ticket_lookup', action: 'ask_clarification', quickReplies: ['Sim'] },
+        shown,
+        back,
+      )
+      expect(r.reopen).toEqual({
+        ticketId: 'INC-20150',
+        reason: `Ana Souza: "${back.employeeMessage}"`,
+      })
+      expect(r.decision).toMatchObject({ intent: 'ticket_reopen', action: 'propose_reopen' })
+      expect(r.decision.extracted.ticketId).toBe('INC-20150')
+      expect(r.decision.quickReplies).toBeUndefined()
+      expect(r.reply).toBe(REPLIES.reopen('INC-20150'))
+      expect(r.overrides).toEqual([expect.objectContaining({ rule: 'reopen_window', to: 'propose_reopen' })])
+    })
+
+    it('leaves it to the model when the ticket is not reopenable, not named, or already proposed', () => {
+      expect(
+        run({ action: 'ask_clarification' }, { ...shown, reopenableTicketIds: [] }, back).reopen,
+      ).toBeUndefined()
+      expect(
+        run({ action: 'ask_clarification' }, shown, { employeeMessage: 'A senha do SAP bloqueou de novo.' })
+          .reopen,
+      ).toBeUndefined()
+      expect(
+        run({ action: 'propose_reopen' }, { ...shown, drafts: [draft({ kind: 'reopen' })] }, back).reopen,
+      ).toBeUndefined()
+    })
+
+    it('needs a sign that the problem is back', () => {
+      const r = run({ intent: 'ticket_lookup', action: 'show_ticket' }, shown, {
+        employeeMessage: 'Qual o status do INC-20150?',
+      })
+      expect(r.reopen).toBeUndefined()
+      expect(r.decision.action).toBe('show_ticket')
+    })
+
+    it('does not retry a reopen the tool refused', () => {
+      const refusals: TurnEffects['refusals'] = [
+        { tool: 'propose_reopen', error: 'not_reopenable', message: 'passou do prazo' },
+      ]
+      const r = run({ action: 'propose_reopen' }, { ...shown, refusals }, back)
+      expect(r.reopen).toBeUndefined()
+      expect(r.reply).toBe('passou do prazo')
+    })
   })
 
   it('never offers "Confirmar" as a quick reply', () => {

@@ -107,6 +107,7 @@ export async function runTurn(input: TurnInput): Promise<TurnResult> {
   if (policy.transfer && (await input.ports.handoff.transfer(input.conversationId, policy.transfer))) {
     transfer = policy.transfer
   }
+  if (policy.reopen) await proposeReopenByRule(input, recorder, policy.reopen)
   if (policy.reply !== model.reply) emit({ type: 'reply_replaced', text: policy.reply })
 
   const cancelled = new Set(policy.cancelDraftIds)
@@ -182,6 +183,27 @@ async function streamModel(
     if (repaired) return { output: repaired, usage }
     throw err
   }
+}
+
+/** The reopen draft that policy.ts decided on, through the recorder so it shows as a real chip. */
+async function proposeReopenByRule(
+  input: TurnInput,
+  recorder: TurnRecorder,
+  { ticketId, reason }: { ticketId: string; reason: string },
+): Promise<void> {
+  const draft = await recorder.record(
+    'propose_reopen',
+    () =>
+      input.ports.drafts.propose({
+        conversationId: input.conversationId,
+        employeeId: input.user.id,
+        kind: 'reopen',
+        ticketId,
+        note: reason,
+      }),
+    (d) => `${d.id}: reabrir ${ticketId} (regra do código)`,
+  )
+  recorder.effects.drafts.push(draft)
 }
 
 /** The model's raw text, which Mastra attaches to a structured-output validation error. */

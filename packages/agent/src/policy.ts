@@ -1,6 +1,7 @@
 import {
   CONFIDENCE,
   PRIORITY_LABELS,
+  REOPEN_WINDOW_DAYS,
   type Action,
   type Draft,
   type DraftKind,
@@ -36,6 +37,8 @@ export type PolicyResult = {
   transfer?: TransferPlan
   /** Drafts proposed this turn that code withdrew. */
   cancelDraftIds: string[]
+  /** A reopen draft code must propose now (the model only asked). */
+  reopen?: { ticketId: string; reason: string }
 }
 
 const PROPOSALS: Partial<Record<Action, DraftKind>> = {
@@ -56,6 +59,8 @@ export const REPLIES = {
     'Não tenho certeza de que entendi o seu pedido. Para não te passar uma informação errada, vou transferir para um analista, que já vai receber o resumo da conversa.',
   outOfScope:
     'Eu cuido só de assuntos de TI (acessos, rede e VPN, equipamentos, softwares e e-mail). Para RH, financeiro ou facilities, procure a área responsável pelos canais internos.',
+  reopen: (ticketId: string) =>
+    `O ${ticketId} foi resolvido há poucos dias, então dá para reabri-lo. Preparei a reabertura: confira abaixo e clique em Confirmar.`,
   clarify: (missing: string[]) =>
     'Antes de registrar qualquer coisa, quero ter certeza de que entendi. ' +
     (missing.length
@@ -126,8 +131,30 @@ export function applyPolicy(input: PolicyInput): PolicyResult {
     return { decision, reply, overrides, cancelDraftIds }
   }
 
-  // A draft was proposed but the action says otherwise (or vice versa): trust what the tools did.
   const draft = effects.drafts.at(-1)
+
+  // Annex A: a ticket resolved up to 7 days ago is reopened, not duplicated. When the employee names
+  // it, says the problem is back and the tools showed it can be reopened, code proposes the reopen
+  // instead of letting the model ask again (it tended to stop at get_ticket).
+  const reopenId = draft ? undefined : reopenTarget(input)
+  if (reopenId) {
+    setAction(
+      'propose_reopen',
+      'reopen_window',
+      `${reopenId} foi resolvido há até ${REOPEN_WINDOW_DAYS} dias e o funcionário disse que o problema voltou: o código preparou a reabertura.`,
+    )
+    const { quickReplies: _dropped, ...rest } = decision
+    decision = { ...rest, intent: 'ticket_reopen', extracted: { ...rest.extracted, ticketId: reopenId } }
+    return {
+      decision,
+      reply: REPLIES.reopen(reopenId),
+      overrides,
+      cancelDraftIds,
+      reopen: { ticketId: reopenId, reason: `${employeeName}: "${employeeMessage.slice(0, 3000)}"` },
+    }
+  }
+
+  // A draft was proposed but the action says otherwise (or vice versa): trust what the tools did.
   const claimedKind = PROPOSALS[decision.action]
   if (draft && claimedKind !== draft.kind) decision = { ...decision, action: ACTION_BY_KIND[draft.kind] }
   if (!draft && claimedKind) {
@@ -211,6 +238,24 @@ export function applyPolicy(input: PolicyInput): PolicyResult {
   }
 
   return { decision, reply, overrides, ...(transfer ? { transfer } : {}), cancelDraftIds }
+}
+
+const TICKET_ID = /\b(?:INC|REQ)-\d{5}\b/gi
+const REOPEN_WORDS = /\b(de novo|novamente|outra vez|voltou|voltaram|reabr\w*)\b/i
+
+/**
+ * The ticket code should reopen: named in the employee's message, shown by a tool this turn as
+ * reopenable, the employee (or the model's intent) says the problem is back, and the model proposed
+ * nothing (it asked, replied or showed the ticket). A refused propose_reopen is never retried.
+ */
+function reopenTarget({ decision, effects, employeeMessage }: PolicyInput): string | undefined {
+  const asked = ['ask_clarification', 'reply', 'show_ticket', 'propose_reopen'].includes(decision.action)
+  const isBack = decision.intent === 'ticket_reopen' || REOPEN_WORDS.test(employeeMessage)
+  if (!asked || !isBack || effects.refusals.some((r) => r.tool === 'propose_reopen')) return undefined
+  const named = employeeMessage.match(TICKET_ID)?.map((id) => id.toUpperCase()) ?? []
+  const reopenable = named.filter((id) => effects.reopenableTicketIds.includes(id))
+  // Two different reopenable tickets named: ambiguous, let the model ask.
+  return new Set(reopenable).size === 1 ? reopenable[0] : undefined
 }
 
 /** Confirmation is a click on the draft card, never typed text, so "Confirmar" is not offered as a quick reply. */
