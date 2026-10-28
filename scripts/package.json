@@ -1,0 +1,19 @@
+{
+  "name": "@nexo/scripts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "init:local": "tsx src/init.ts",
+    "seed:reset": "tsx src/init.ts --reset",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.1158.0",
+    "@aws-sdk/client-sqs": "^3.1158.0",
+    "@nexo/shared": "workspace:*",
+    "mongodb": "^7.7.0",
+    "tsx": "^4.23.15",
+    "zod": "^4.6.7"
+  }
+}

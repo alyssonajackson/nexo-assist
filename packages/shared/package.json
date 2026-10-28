@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./aws": "./src/aws/index.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
@@ -12,6 +13,8 @@
   "dependencies": {
     "@date-fns/tz": "^1.5.0",
     "date-fns": "^4.4.0",
-    "zod": "^4.6.7"
+    "zod": "^4.6.7",
+    "@aws-sdk/client-cognito-identity-provider": "^3.1158.0",
+    "@aws-sdk/client-sqs": "^3.1158.0"
   }
 }
