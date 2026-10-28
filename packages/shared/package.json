@@ -11,10 +11,11 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.1158.0",
+    "@aws-sdk/client-sqs": "^3.1158.0",
     "@date-fns/tz": "^1.5.0",
     "date-fns": "^4.4.0",
-    "zod": "^4.6.7",
-    "@aws-sdk/client-cognito-identity-provider": "^3.1158.0",
-    "@aws-sdk/client-sqs": "^3.1158.0"
+    "jose": "^6.2.13",
+    "zod": "^4.6.7"
   }
 }
