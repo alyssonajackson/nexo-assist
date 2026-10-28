@@ -1,5 +1,5 @@
 import 'server-only'
-import { intFromEnv } from '@nexo/shared'
+import { intFromEnv, llmKeyFor, type ProductionEnvSpec } from '@nexo/shared'
 
 const e = process.env
 
@@ -22,4 +22,26 @@ export const env = {
     loginPerIpPer15Min: intFromEnv(e, 'LOGIN_ATTEMPTS_PER_IP', 20),
     loginFailuresPerEmailPer15Min: intFromEnv(e, 'LOGIN_FAILURES_PER_EMAIL', 5),
   },
+}
+
+/** Checked once at startup when APP_ENV=production (instrumentation.ts). */
+export const PRODUCTION_ENV: ProductionEnvSpec = {
+  required: [
+    'MONGODB_URI',
+    'TICKETS_URL',
+    'AWS_REGION',
+    'AWS_ACCESS_KEY_ID',
+    'AWS_SECRET_ACCESS_KEY',
+    'COGNITO_USER_POOL_ID',
+    'COGNITO_CLIENT_ID',
+    'LLM_MODEL',
+    ...[llmKeyFor(e.LLM_MODEL)].filter((k) => k !== undefined),
+  ],
+  forbidden: [
+    'COGNITO_ENDPOINT',
+    'SQS_ENDPOINT',
+    'COGNITO_ISSUER_DOMAIN',
+    'COGNITO_JWKS_DOMAIN',
+    'INSECURE_COOKIES',
+  ],
 }

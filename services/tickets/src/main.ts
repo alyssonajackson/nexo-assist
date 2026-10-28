@@ -1,5 +1,13 @@
 import { serve } from '@hono/node-server'
-import { AssistEvent, createJwtVerifier, HandoffEvent, QUEUES, TicketWriteMessage } from '@nexo/shared'
+import {
+  AssistEvent,
+  assertProductionEnv,
+  isProduction,
+  createJwtVerifier,
+  HandoffEvent,
+  QUEUES,
+  TicketWriteMessage,
+} from '@nexo/shared'
 import { cognitoClient, resolveCognitoConfig, SqsEventQueue, sqsClient } from '@nexo/shared/aws'
 import { createApp } from './app'
 import { handoffEventsHandler, ticketWritesHandler } from './consumers'
@@ -8,16 +16,32 @@ import { OutageSimulator } from './outage'
 import { TicketService } from './ticket-service'
 
 const env = {
-  port: Number(process.env.TICKETS_PORT ?? 4000),
+  // TICKETS_PORT locally (.env also reaches the web container); PORT is what hosting platforms inject.
+  port: Number(process.env.TICKETS_PORT ?? process.env.PORT ?? 4000),
   mongoUri: process.env.MONGODB_URI ?? 'mongodb://localhost:27017/?directConnection=true',
   flaky: process.env.FLAKY_ENABLED !== 'false',
   flakyMeanIntervalMs: Number(process.env.FLAKY_MEAN_INTERVAL_S ?? 120) * 1000,
   flakyMinMs: Number(process.env.FLAKY_MIN_MS ?? 3000),
   flakyMaxMs: Number(process.env.FLAKY_MAX_MS ?? 8000),
-  chaosEnabled: process.env.CHAOS_ENABLED === 'true',
+  // The chaos endpoint is unauthenticated: never in production, whatever the env says.
+  chaosEnabled: process.env.CHAOS_ENABLED === 'true' && !isProduction(),
+}
+
+/** Checked at startup when APP_ENV=production: no emulator endpoints, every secret set. */
+const PRODUCTION_ENV = {
+  required: [
+    'MONGODB_URI',
+    'AWS_REGION',
+    'AWS_ACCESS_KEY_ID',
+    'AWS_SECRET_ACCESS_KEY',
+    'COGNITO_USER_POOL_ID',
+    'COGNITO_CLIENT_ID',
+  ],
+  forbidden: ['COGNITO_ENDPOINT', 'SQS_ENDPOINT', 'COGNITO_ISSUER_DOMAIN', 'COGNITO_JWKS_DOMAIN'],
 }
 
 async function main() {
+  assertProductionEnv('tickets', PRODUCTION_ENV)
   const { client: mongo, db } = await connectTicketsDb(env.mongoUri)
   const service = new TicketService(db)
 
