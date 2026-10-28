@@ -17,7 +17,7 @@ export function ChatView() {
   const running = isTurnRunning(state)
   const limit = limitReached(state)
   const closed = isClosed(state)
-  const empty = state.messages.length === 0 && !state.turn
+  const empty = state.messages.length === 0 && !state.turn && !state.error?.unsentText
 
   const contentKey = [
     state.messages.length,
@@ -51,6 +51,7 @@ export function ChatView() {
           {state.error && !limit && !closed && (
             <ErrorNotice
               message={state.error.message}
+              signedOut={state.error.code === 'unauthorized'}
               {...(state.error.retry ? { onRetry: chat.retry } : {})}
             />
           )}

@@ -24,10 +24,24 @@ function Notice({ tone, icon, children }: { tone: Tone; icon: ReactNode; childre
 const actionClass =
   'flex h-8 items-center gap-1.5 rounded-md bg-surface px-3 text-[13px] font-medium text-ink shadow-button outline outline-1 -outline-offset-[.5px] outline-border-strong hover:bg-surface-muted'
 
-export function ErrorNotice({ message, onRetry }: { message: string; onRetry?: () => void }) {
+export function ErrorNotice({
+  message,
+  onRetry,
+  signedOut = false,
+}: {
+  message: string
+  onRetry?: () => void
+  /** The session expired: the way out is signing in again. */
+  signedOut?: boolean
+}) {
   return (
     <Notice tone="danger" icon={<AlertCircle className="size-4 shrink-0" aria-hidden="true" />}>
       <span className="flex-1">{message}</span>
+      {signedOut && (
+        <a href="/login" className={actionClass}>
+          Entrar novamente
+        </a>
+      )}
       {onRetry && (
         <button type="button" onClick={onRetry} className={actionClass}>
           <RotateCcw className="size-3.5" aria-hidden="true" />

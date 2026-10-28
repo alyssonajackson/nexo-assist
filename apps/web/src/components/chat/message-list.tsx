@@ -27,6 +27,7 @@ export function MessageList() {
         }
       })}
       {state.turn && <LiveTurn turn={state.turn} />}
+      {state.error?.unsentText && <EmployeeBubble text={state.error.unsentText} unsent />}
     </div>
   )
 }

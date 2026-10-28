@@ -31,7 +31,13 @@ export type LiveTurn = {
   status?: Omit<StatusEvent, 'type'>
 }
 
-export type ChatError = { code: string; message: string; retry?: ChatRequestKind }
+export type ChatError = {
+  code: string
+  message: string
+  retry?: ChatRequestKind
+  /** The employee's text never reached the server: keep it on screen, marked as not sent. */
+  unsentText?: string
+}
 
 export type ChatState = {
   conversation: Conversation | null
@@ -76,7 +82,12 @@ const appendMessage = (messages: Message[], message: Message): Message[] =>
 
 function failWith(state: ChatState, code: string, message: string): ChatState {
   const retry = state.turn && !FINAL_ERRORS.has(code) ? state.turn.request : undefined
-  return { ...state, turn: null, error: { code, message, ...(retry ? { retry } : {}) } }
+  const unsentText = state.turn?.pendingEmployeeText
+  return {
+    ...state,
+    turn: null,
+    error: { code, message, ...(retry ? { retry } : {}), ...(unsentText ? { unsentText } : {}) },
+  }
 }
 
 function applyEvent(state: ChatState, event: ChatStreamEvent): ChatState {

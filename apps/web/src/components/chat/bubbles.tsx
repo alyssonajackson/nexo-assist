@@ -1,16 +1,25 @@
 import type { ReactNode } from 'react'
 
 /** The employee's own message: dark, right-aligned. */
-export function EmployeeBubble({ text, pending = false }: { text: string; pending?: boolean }) {
+export function EmployeeBubble({
+  text,
+  pending = false,
+  unsent = false,
+}: {
+  text: string
+  pending?: boolean
+  unsent?: boolean
+}) {
   return (
-    <div className="flex justify-end">
+    <div className="flex flex-col items-end gap-1">
       <p
         className={`max-w-[520px] rounded-[12px_12px_4px_12px] bg-bubble-employee px-4 py-[11px] text-[14.5px]/[21px] whitespace-pre-line text-white ${
-          pending ? 'opacity-70' : ''
+          pending || unsent ? 'opacity-70' : ''
         }`}
       >
         {text}
       </p>
+      {unsent && <span className="text-[12px] text-danger-700">Não enviada</span>}
     </div>
   )
 }

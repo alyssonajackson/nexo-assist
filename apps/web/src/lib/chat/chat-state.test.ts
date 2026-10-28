@@ -9,7 +9,9 @@ import type {
   ToolCall,
 } from '@nexo/shared'
 import {
+  activeDraftId,
   chatReducer,
+  draftCardOwners,
   initialState,
   isClosed,
   isHandedOff,
@@ -263,14 +265,34 @@ describe('stream events', () => {
 
   describe('error', () => {
     it('ends the turn and offers retry with the same request', () => {
-      const state = run(running(), ev({ type: 'error', error: 'llm_failed', message: 'falhou' }))
+      const state = run(
+        running(confirmRequest),
+        ev({ type: 'error', error: 'llm_failed', message: 'falhou' }),
+      )
       expect(state.turn).toBeNull()
-      expect(state.error).toEqual({ code: 'llm_failed', message: 'falhou', retry: msgRequest })
+      expect(state.error).toEqual({ code: 'llm_failed', message: 'falhou', retry: confirmRequest })
+    })
+    it('keeps the text on screen when the server never stored it', () => {
+      const state = run(running(), ev({ type: 'error', error: 'llm_failed', message: 'falhou' }))
+      expect(state.error).toEqual({
+        code: 'llm_failed',
+        message: 'falhou',
+        retry: msgRequest,
+        unsentText: msgRequest.text,
+      })
+    })
+    it('does not mark the text unsent once the server echoed it', () => {
+      const state = run(
+        running(),
+        ev({ type: 'employee_message', message: message({ role: 'employee', text: msgRequest.text }) }),
+        ev({ type: 'error', error: 'llm_failed', message: 'falhou' }),
+      )
+      expect(state.error).not.toHaveProperty('unsentText')
     })
     it.each(['message_limit', 'closed', 'not_pending', 'not_found', 'unauthorized'])(
       'has no retry for the final code %s',
       (code) => {
-        const state = run(running(), ev({ type: 'error', error: code, message: 'm' }))
+        const state = run(running(confirmRequest), ev({ type: 'error', error: code, message: 'm' }))
         expect(state.turn).toBeNull()
         expect(state.error).toEqual({ code, message: 'm' })
         expect(state.error).not.toHaveProperty('retry')
@@ -291,7 +313,7 @@ describe('turn_failed', () => {
   })
   it('has no retry for a final code', () => {
     const state = run(running(), { type: 'turn_failed', code: 'unauthorized', message: 'x' })
-    expect(state.error).toEqual({ code: 'unauthorized', message: 'x' })
+    expect(state.error).toEqual({ code: 'unauthorized', message: 'x', unsentText: msgRequest.text })
   })
 })
 
@@ -453,5 +475,60 @@ describe('selectors', () => {
       const messages = [...base, message({ id: 'e1', text: 'inc-20311 · notebook lento' })]
       expect(pickedOption(messages, 'a1', ticketOptions)).toBe('INC-20311 · Notebook lento')
     })
+  })
+})
+
+const withDraftPart = (id: string, draftId: string): Message =>
+  message({ id, role: 'agent', parts: [{ type: 'draft', draftId }] })
+
+describe('draftCardOwners', () => {
+  it('gives the card to the first message that references the draft', () => {
+    const owners = draftCardOwners([withDraftPart('a1', 'D-1'), withDraftPart('a2', 'D-1')])
+    expect(owners.get('D-1')).toBe('a1')
+  })
+  it('tracks several drafts independently', () => {
+    const owners = draftCardOwners([
+      withDraftPart('a1', 'D-1'),
+      message({ id: 'e1' }),
+      withDraftPart('a2', 'D-2'),
+      withDraftPart('a3', 'D-1'),
+    ])
+    expect([...owners]).toEqual([
+      ['D-1', 'a1'],
+      ['D-2', 'a2'],
+    ])
+  })
+  it('is empty when no message has a draft part', () => {
+    expect(draftCardOwners([message()]).size).toBe(0)
+  })
+})
+
+describe('activeDraftId', () => {
+  const stateWith = (messages: Message[], drafts: Draft[]): ChatState => ({
+    ...initialState(null),
+    messages,
+    drafts: Object.fromEntries(drafts.map((d) => [d.id, d])),
+  })
+
+  it('returns the most recent referenced draft that is pending', () => {
+    const state = stateWith(
+      [withDraftPart('a1', 'D-1'), withDraftPart('a2', 'D-2')],
+      [draft({ id: 'D-1' }), draft({ id: 'D-2' })],
+    )
+    expect(activeDraftId(state)).toBe('D-2')
+  })
+  it('skips later drafts that are no longer pending', () => {
+    const state = stateWith(
+      [withDraftPart('a1', 'D-1'), withDraftPart('a2', 'D-2')],
+      [draft({ id: 'D-1' }), draft({ id: 'D-2', status: 'cancelled' })],
+    )
+    expect(activeDraftId(state)).toBe('D-1')
+  })
+  it('is undefined when nothing is pending', () => {
+    const state = stateWith([withDraftPart('a1', 'D-1')], [draft({ id: 'D-1', status: 'cancelled' })])
+    expect(activeDraftId(state)).toBeUndefined()
+  })
+  it('ignores pending drafts that no message references', () => {
+    expect(activeDraftId(stateWith([message()], [draft({ id: 'D-9' })]))).toBeUndefined()
   })
 })
