@@ -15,6 +15,8 @@ const defaults = {
   TICKETS_URL: 'http://localhost:4000',
   WEB_URL: 'http://localhost:3000',
   SEED_PASSWORD: 'nexo123',
+  /** Set to 1 to run tests that restart containers of the shared stack (CI does). */
+  INTEGRATION_RESTARTS: '0',
 } as const
 
 for (const [key, value] of Object.entries(defaults)) process.env[key] ??= value
