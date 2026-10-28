@@ -4,10 +4,14 @@
  * 2. Cognito user pool, app client, groups and seeded users (Floci or real Cognito)
  * 3. SQS queues and their dead-letter queues (Floci or real SQS)
  * 4. Seed data relative to "now" (only when empty, when Cognito ids changed, or with --reset)
+ *
+ * MANAGED_INFRA=true (online, docs/deploy.md): Atlas already is a replica set and infra/ (Terraform)
+ * owns the pool, the client, the groups and the queues. Only the users and the seed are created,
+ * in the pool given by COGNITO_USER_POOL_ID.
  */
 import { MongoClient } from 'mongodb'
 import { ASSIST_COLLECTIONS, DB } from '@nexo/shared'
-import { cognitoClient, sqsClient } from '@nexo/shared/aws'
+import { cognitoClient, resolveCognitoConfig, sqsClient } from '@nexo/shared/aws'
 import { ensureUser, ensureUserPool } from './lib/cognito'
 import { ensureReplicaSet } from './lib/mongo'
 import { ensureQueues } from './lib/queues'
@@ -19,13 +23,16 @@ const env = {
   poolName: process.env.COGNITO_USER_POOL_NAME ?? 'nexo-assist',
   seedPassword: process.env.SEED_PASSWORD ?? 'nexo123',
   reset: process.argv.includes('--reset'),
+  managedInfra: process.env.MANAGED_INFRA === 'true',
 }
 
 async function main() {
-  await ensureReplicaSet(env.mongoUri, env.replicaHost)
+  if (!env.managedInfra) await ensureReplicaSet(env.mongoUri, env.replicaHost)
 
   const cognito = cognitoClient()
-  const { userPoolId, clientId } = await ensureUserPool(cognito, env.poolName)
+  const { userPoolId, clientId } = env.managedInfra
+    ? await resolveCognitoConfig(cognito)
+    : await ensureUserPool(cognito, env.poolName)
   const ids = {} as UserIds
   for (const u of seedUsers) {
     ids[u.key] = await ensureUser(cognito, userPoolId, {
@@ -37,7 +44,7 @@ async function main() {
   }
   console.log(`cognito: pool ${userPoolId}, client ${clientId}, ${seedUsers.length} users`)
 
-  await ensureQueues(sqsClient())
+  if (!env.managedInfra) await ensureQueues(sqsClient())
 
   const mongo = new MongoClient(env.mongoUri)
   await mongo.connect()
