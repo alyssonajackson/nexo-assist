@@ -64,6 +64,9 @@ services:
     environment:
       <<: *aws-local
       TICKETS_PORT: 4000
+      # Simulated legacy flakiness: an outage of 3-8 s every ~2 min. The chaos endpoint is local-only.
+      FLAKY_ENABLED: ${FLAKY_ENABLED:-true}
+      CHAOS_ENABLED: 'true'
     depends_on:
       init: { condition: service_completed_successfully }
     healthcheck:
