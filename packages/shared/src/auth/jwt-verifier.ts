@@ -1,5 +1,5 @@
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from 'jose'
-import { roleFromGroups, UnauthorizedError, type AuthUser } from './auth'
+import { isUnauthorizedError, roleFromGroups, UnauthorizedError, type AuthUser } from './auth'
 
 export type JwtVerifierConfig = {
   /** Expected `iss`, e.g. https://cognito-idp.us-east-1.amazonaws.com/<poolId>. */
@@ -33,7 +33,7 @@ export function createJwtVerifier(config: JwtVerifierConfig) {
         role: roleFromGroups(groups),
       }
     } catch (err) {
-      if (err instanceof UnauthorizedError) throw err
+      if (isUnauthorizedError(err)) throw err
       throw new UnauthorizedError(err instanceof Error ? err.message : 'Invalid token')
     }
   }

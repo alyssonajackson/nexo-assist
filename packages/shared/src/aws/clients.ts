@@ -5,7 +5,7 @@ import { SQSClient } from '@aws-sdk/client-sqs'
  * AWS SDK v3 clients. The only difference between local (cognito-local / ElasticMQ) and AWS
  * is the endpoint and the credentials, both from env. Without an endpoint the SDK talks to AWS.
  */
-export type AwsEnv = {
+export type AwsEnv = Record<string, string | undefined> & {
   AWS_REGION?: string
   COGNITO_ENDPOINT?: string
   SQS_ENDPOINT?: string

@@ -9,7 +9,7 @@ import {
   NoteBody,
   ReopenBody,
   TransferBody,
-  UnauthorizedError,
+  isUnauthorizedError,
   type Actor,
   type AuthUser,
   type ErrorResponse,
@@ -117,7 +117,7 @@ export function createApp({ service, verify, outage, chaosEnabled }: AppDeps) {
   })
 
   app.onError((err, c) => {
-    if (err instanceof UnauthorizedError) return fail(c, 401, { error: 'unauthorized', message: err.message })
+    if (isUnauthorizedError(err)) return fail(c, 401, { error: 'unauthorized', message: err.message })
     if (err instanceof DomainError) return fail(c, err.status, { error: err.code, message: err.message })
     if (err instanceof BadRequest || err instanceof SyntaxError) {
       return fail(c, 400, { error: 'bad_request', message: err.message })

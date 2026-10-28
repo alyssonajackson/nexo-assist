@@ -15,7 +15,7 @@ export type CognitoConfig = {
   jwksUrl: string
 }
 
-export type CognitoEnv = {
+export type CognitoEnv = Record<string, string | undefined> & {
   AWS_REGION?: string
   COGNITO_USER_POOL_ID?: string
   COGNITO_CLIENT_ID?: string

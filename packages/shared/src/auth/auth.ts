@@ -44,3 +44,13 @@ export class UnauthorizedError extends Error {
 /** The analyst group wins if a user is in both. */
 export const roleFromGroups = (groups: readonly string[]): Role =>
   groups.includes('analyst') ? 'analyst' : 'employee'
+
+/**
+ * Checks by name instead of `instanceof`: Next.js bundles the proxy and the app separately, and the
+ * AuthProvider singleton may come from either bundle, so the same class can exist twice at runtime.
+ */
+export const isUnauthorizedError = (err: unknown): err is Error & { name: 'UnauthorizedError' } =>
+  err instanceof Error && err.name === 'UnauthorizedError'
+
+export const isInvalidCredentialsError = (err: unknown): err is Error & { name: 'InvalidCredentialsError' } =>
+  err instanceof Error && err.name === 'InvalidCredentialsError'
