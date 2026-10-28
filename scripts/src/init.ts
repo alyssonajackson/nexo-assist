@@ -19,7 +19,8 @@ import { seedAssistDb, seedTicketsDb, seedUsers, type UserIds } from './seed/see
 
 const env = {
   mongoUri: process.env.MONGODB_URI ?? 'mongodb://localhost:27017/?directConnection=true',
-  replicaHost: process.env.MONGO_REPLICA_HOST ?? 'localhost:27017',
+  // The compose service name works from the host too: mongod resolves it inside its own container.
+  replicaHost: process.env.MONGO_REPLICA_HOST ?? 'mongo:27017',
   poolName: process.env.COGNITO_USER_POOL_NAME ?? 'nexo-assist',
   seedPassword: process.env.SEED_PASSWORD ?? 'nexo123',
   reset: process.argv.includes('--reset'),
