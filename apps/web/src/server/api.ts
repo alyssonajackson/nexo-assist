@@ -35,13 +35,23 @@ export function ndjson(run: (emit: Emit) => Promise<void>): Response {
   const encoder = new TextEncoder()
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const emit: Emit = (event) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`))
+      // The browser may leave mid-turn (reload, lost connection): the turn still finishes and is
+      // stored, so "voltar e continuar" shows it; only the live stream stops.
+      let open = true
+      const emit: Emit = (event) => {
+        if (!open) return
+        try {
+          controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`))
+        } catch {
+          open = false
+        }
+      }
       try {
         await run(emit)
       } catch (err) {
         emit(errorEvent(err))
       } finally {
-        controller.close()
+        if (open) controller.close()
       }
     },
   })
