@@ -72,11 +72,21 @@ export async function takeOver(conversationId: string, analyst: Actor): Promise<
   return conv
 }
 
-/** waiting_analyst | analyst -> agent ("Devolver ao agent"). */
+/** While `analyst`, only the assigned analyst may act; `waiting_analyst` is open to any analyst. */
+const assigneeOrWaiting = (analystId: string) => ({
+  $or: [{ state: 'waiting_analyst' as const }, { assignedAnalystId: analystId }],
+})
+
+/** waiting_analyst | analyst (assignee only) -> agent ("Devolver ao agent"). */
 export async function giveBack(conversationId: string, analyst: Actor): Promise<Conversation | null> {
-  const conv = await transition(conversationId, ['waiting_analyst', 'analyst'], 'agent', {}, [
-    'assignedAnalystId',
-  ])
+  const conv = await transition(
+    conversationId,
+    ['waiting_analyst', 'analyst'],
+    'agent',
+    {},
+    ['assignedAnalystId'],
+    assigneeOrWaiting(analyst.userId),
+  )
   if (!conv) return null
   await systemMessage(conversationId, divider(`${analyst.name} devolveu a conversa ao agent`))
   await publish({ type: 'released', conversationId, actor: analyst, ...ticketOf(conv) })
@@ -87,9 +97,14 @@ export async function closeConversation(
   conversationId: string,
   analyst: Actor,
 ): Promise<Conversation | null> {
-  const conv = await transition(conversationId, ['waiting_analyst', 'analyst'], 'closed', {
-    closedAt: new Date(),
-  })
+  const conv = await transition(
+    conversationId,
+    ['waiting_analyst', 'analyst'],
+    'closed',
+    { closedAt: new Date() },
+    [],
+    assigneeOrWaiting(analyst.userId),
+  )
   if (!conv) return null
   await systemMessage(conversationId, divider(`Atendimento encerrado por ${analyst.name}`))
   await publish({ type: 'closed', conversationId, actor: analyst, ...ticketOf(conv) })

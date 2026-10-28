@@ -23,7 +23,7 @@ const PILL: Record<StatusTone, string> = {
 }
 
 const outlined =
-  'flex h-10 whitespace-nowrap items-center gap-2 rounded-lg bg-surface px-3.5 text-[14px] font-medium text-ink shadow-button outline outline-1 -outline-offset-[.5px] outline-border-strong hover:bg-surface-muted disabled:opacity-50'
+  'flex h-10 shrink-0 whitespace-nowrap items-center gap-2 rounded-lg bg-surface px-3.5 text-[14px] font-medium text-ink shadow-button outline outline-1 -outline-offset-[.5px] outline-border-strong hover:bg-surface-muted disabled:opacity-50'
 
 type Props = {
   data: ConsoleConversationResponse | null
@@ -162,30 +162,30 @@ export function ConversationPane({
 
       <footer className="shrink-0 border-t border-border bg-surface px-5 py-3">
         {c.state === 'waiting_analyst' && (
-          <div className="mb-3 flex items-center gap-3">
+          <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
             <span className="grid size-[38px] shrink-0 place-items-center rounded-full bg-warning-bg text-warning-ink">
               <Hand className="size-[18px]" aria-hidden="true" />
             </span>
-            <div className="flex-1">
-              <p className="text-[15px] font-semibold whitespace-nowrap text-ink">
-                {firstName} espera um atendente
-              </p>
-              <p className="text-[13px] whitespace-nowrap text-ink-muted">
+            <div className="min-w-[200px] flex-1">
+              <p className="text-[15px] font-semibold text-ink">{firstName} espera um atendente</p>
+              <p className="text-[13px] text-ink-muted">
                 Agent pausado{data.waitingUntil ? ` · até ${formatTime(data.waitingUntil)}` : ''}
               </p>
             </div>
-            <button onClick={onGiveBack} disabled={busy} className={outlined}>
-              <Bot className="size-4 text-ink-muted" aria-hidden="true" />
-              Devolver ao agent
-            </button>
-            <button
-              onClick={onTakeOver}
-              disabled={busy}
-              className="flex h-10 items-center gap-2 rounded-lg bg-primary-600 whitespace-nowrap px-4 text-[14px] font-semibold text-white shadow-cta hover:bg-primary-700 disabled:opacity-50"
-            >
-              <Headset className="size-4" aria-hidden="true" />
-              Assumir atendimento
-            </button>
+            <div className="ml-auto flex gap-3">
+              <button onClick={onGiveBack} disabled={busy} className={outlined}>
+                <Bot className="size-4 text-ink-muted" aria-hidden="true" />
+                Devolver ao agent
+              </button>
+              <button
+                onClick={onTakeOver}
+                disabled={busy}
+                className="flex h-10 shrink-0 items-center gap-2 rounded-lg bg-primary-600 whitespace-nowrap px-4 text-[14px] font-semibold text-white shadow-cta hover:bg-primary-700 disabled:opacity-50"
+              >
+                <Headset className="size-4" aria-hidden="true" />
+                Assumir atendimento
+              </button>
+            </div>
           </div>
         )}
         <ReplyBox enabled={mine} hint={hintFor(c.state, mine)} onSend={onReply} key={c.id} />
