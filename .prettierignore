@@ -1,0 +1,8 @@
+.beads
+_specs
+_temp
+pnpm-lock.yaml
+**/.next
+**/dist
+CLAUDE.md
+AGENTS.md
