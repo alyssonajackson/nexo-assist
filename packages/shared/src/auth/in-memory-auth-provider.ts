@@ -22,9 +22,10 @@ export class InMemoryAuthProvider implements AuthProvider {
   }
 
   async refresh(refreshToken: string): Promise<AuthTokens> {
-    const user = this.sessions.get(refreshToken)
+    const session = this.sessions.get(refreshToken)
+    const user = this.users.find((u) => u.userId === session?.userId)
     if (!user) throw new UnauthorizedError('Unknown refresh token')
-    return this.issue({ ...user, password: '' })
+    return this.issue(user)
   }
 
   async verify(accessToken: string): Promise<AuthUser> {
