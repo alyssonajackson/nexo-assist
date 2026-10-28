@@ -72,6 +72,31 @@ export const Extracted = z.object({
 })
 export type Extracted = z.infer<typeof Extracted>
 
+/** Agent tools. The model has no tool that creates, updates or reopens a ticket: only the Confirmar button does. */
+export const ToolName = z.enum([
+  'search_kb',
+  'list_my_tickets',
+  'get_ticket',
+  'classify_priority',
+  'propose_draft',
+  'propose_update',
+  'propose_reopen',
+  'transfer_to_analyst',
+])
+export type ToolName = z.infer<typeof ToolName>
+
+/** Action chips shown above the agent's reply, one per real tool call. */
+export const TOOL_LABELS: Record<ToolName, string> = {
+  search_kb: 'consultou a central de ajuda',
+  list_my_tickets: 'consultou seus chamados',
+  get_ticket: 'abriu o chamado',
+  classify_priority: 'classificou a prioridade',
+  propose_draft: 'montou um rascunho',
+  propose_update: 'montou uma atualização',
+  propose_reopen: 'montou uma reabertura',
+  transfer_to_analyst: 'transferiu para um analista',
+}
+
 /** One real tool call, recorded by code (never claimed by the model). */
 export const ToolCall = z.object({
   tool: z.string(),
@@ -83,9 +108,23 @@ export const ToolCall = z.object({
 })
 export type ToolCall = z.infer<typeof ToolCall>
 
+/** Annex A rules that code enforces on top of the model (packages/agent/src/policy.ts and the tools). */
+export const RuleName = z.enum([
+  'low_confidence',
+  'gray_zone_confidence',
+  'out_of_scope',
+  'explicit_analyst_request',
+  'critical_transfer',
+  'overdue_offer',
+  'duplicate_check',
+  'reopen_window',
+  'action_without_tool',
+])
+export type RuleName = z.infer<typeof RuleName>
+
 /** A rule enforced by code that changed or constrained what the model decided. */
 export const RuleOverride = z.object({
-  rule: z.string(),
+  rule: RuleName,
   from: z.string().optional(),
   to: z.string().optional(),
   why: z.string(),
