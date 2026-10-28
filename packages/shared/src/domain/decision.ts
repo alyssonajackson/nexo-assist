@@ -1,0 +1,116 @@
+import { z } from 'zod'
+import { Affected, Category, Priority, TicketType } from './ticket'
+
+/** What the employee wants, as understood by the agent. */
+export const Intent = z.enum([
+  'kb_question',
+  'ticket_lookup',
+  'ticket_create',
+  'ticket_update',
+  'ticket_reopen',
+  'request_analyst',
+  'out_of_scope',
+  'smalltalk',
+  'unclear',
+])
+export type Intent = z.infer<typeof Intent>
+
+export const INTENT_LABELS: Record<Intent, string> = {
+  kb_question: 'Dúvida (central de ajuda)',
+  ticket_lookup: 'Consultar chamado',
+  ticket_create: 'Abrir chamado',
+  ticket_update: 'Complementar chamado',
+  ticket_reopen: 'Reabrir chamado',
+  request_analyst: 'Falar com analista',
+  out_of_scope: 'Fora do escopo de TI',
+  smalltalk: 'Conversa',
+  unclear: 'Não ficou claro',
+}
+
+/** What the agent did in this turn. */
+export const Action = z.enum([
+  'answer_from_kb',
+  'list_tickets',
+  'show_ticket',
+  'ask_clarification',
+  'propose_draft',
+  'propose_update',
+  'propose_reopen',
+  'commit_draft',
+  'transfer_to_analyst',
+  'redirect_out_of_scope',
+  'reply',
+])
+export type Action = z.infer<typeof Action>
+
+export const ACTION_LABELS: Record<Action, string> = {
+  answer_from_kb: 'Respondeu com a central de ajuda',
+  list_tickets: 'Listou seus chamados',
+  show_ticket: 'Mostrou um chamado',
+  ask_clarification: 'Pediu mais informações',
+  propose_draft: 'Montou um rascunho de chamado',
+  propose_update: 'Montou um rascunho de atualização',
+  propose_reopen: 'Montou um rascunho de reabertura',
+  commit_draft: 'Registrou o chamado confirmado',
+  transfer_to_analyst: 'Transferiu para um analista',
+  redirect_out_of_scope: 'Redirecionou (fora de TI)',
+  reply: 'Respondeu',
+}
+
+/** Fields the agent extracted from the conversation. All optional: it only fills what it understood. */
+export const Extracted = z.object({
+  ticketId: z.string().optional(),
+  title: z.string().optional(),
+  description: z.string().optional(),
+  type: TicketType.optional(),
+  category: Category.optional(),
+  affected: Affected.optional(),
+  sameDayCommitment: z.boolean().optional(),
+  hasWorkaround: z.boolean().optional(),
+  priority: Priority.optional(),
+  kbArticleIds: z.array(z.string()).optional(),
+})
+export type Extracted = z.infer<typeof Extracted>
+
+/** One real tool call, recorded by code (never claimed by the model). */
+export const ToolCall = z.object({
+  tool: z.string(),
+  /** PT-BR chip label, e.g. "consultou seus chamados". */
+  label: z.string(),
+  ok: z.boolean(),
+  ms: z.number().int().nonnegative(),
+  summary: z.string().optional(),
+})
+export type ToolCall = z.infer<typeof ToolCall>
+
+/** A rule enforced by code that changed or constrained what the model decided. */
+export const RuleOverride = z.object({
+  rule: z.string(),
+  from: z.string().optional(),
+  to: z.string().optional(),
+  why: z.string(),
+})
+export type RuleOverride = z.infer<typeof RuleOverride>
+
+/** The part of the decision the model produces (structured output). */
+export const ModelDecision = z.object({
+  intent: Intent,
+  extracted: Extracted,
+  action: Action,
+  confidence: z.number().min(0).max(1),
+  reason: z.string().describe('PT-BR, 1-2 frases explicando por que escolheu esta ação'),
+  quickReplies: z.array(z.string()).max(4).optional(),
+  missingFields: z.array(z.string()).optional(),
+})
+export type ModelDecision = z.infer<typeof ModelDecision>
+
+/** The full decision stored with each assistant message. Drives the chips and the detail panel. */
+export const Decision = ModelDecision.extend({
+  toolsCalled: z.array(ToolCall),
+  ruleOverrides: z.array(RuleOverride),
+  /** "model" when the LLM decided; "code" for deterministic turns (e.g. the employee pressed Confirmar). */
+  source: z.enum(['model', 'code']),
+  model: z.string().optional(),
+  latencyMs: z.number().int().nonnegative().optional(),
+})
+export type Decision = z.infer<typeof Decision>
