@@ -406,7 +406,7 @@ export const tickets: SeedTicket[] = [
   },
 ]
 
-const MODEL = 'anthropic/claude-haiku-4-5'
+const MODEL = 'google/gemini-3.5-flash-lite'
 
 export const conversations: SeedConversation[] = [
   {

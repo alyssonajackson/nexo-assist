@@ -88,7 +88,8 @@ services:
     environment:
       <<: *aws-local
       TICKETS_URL: http://tickets:4000
-      # Secret passed through from your shell (Keychain) or .env; never baked into the image.
+      # Secrets passed through from your shell (Keychain) or .env; never baked into the image.
+      GOOGLE_GENERATIVE_AI_API_KEY: ${GOOGLE_GENERATIVE_AI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     depends_on:
       init: { condition: service_completed_successfully }
