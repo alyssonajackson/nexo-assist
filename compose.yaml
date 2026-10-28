@@ -29,9 +29,11 @@ services:
   cognito:
     image: jagregory/cognito-local:5.3.0
     ports: ['9229:9229']
+    # cognito-local rewrites its config file on start, so copy ours in instead of bind-mounting it.
+    entrypoint: ['sh', '-c', 'cp /config/config.json /app/.cognito/config.json && exec node /app/start.js']
     volumes:
       - cognito-data:/app/.cognito
-      - ./docker/cognito/config.json:/app/.cognito/config.json
+      - ./docker/cognito/config.json:/config/config.json:ro
 
   elasticmq:
     image: softwaremill/elasticmq-native:1.7.1
