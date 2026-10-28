@@ -3,6 +3,7 @@ _specs
 _temp
 pnpm-lock.yaml
 **/.next
+**/.next-*
 **/dist
 CLAUDE.md
 AGENTS.md

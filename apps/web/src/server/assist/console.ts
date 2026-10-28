@@ -104,20 +104,20 @@ export async function consoleConversationView(
 
   // The employee's tickets come from the tickets service with the analyst's own token. The service may
   // be down: the conversation still opens, the side panel just stays empty.
-  let tickets: TicketView[] = []
+  let tickets: TicketView[] | undefined
   try {
     tickets = await ticketsAs(session.accessToken).listTickets({
       scope: 'all',
       requesterId: conversation.employeeId,
     })
   } catch {
-    tickets = []
+    tickets = undefined
   }
 
   const ticketId = currentTicketId(conversation)
   const until = waitingUntil(
     conversation,
-    tickets.find((t) => t.id === ticketId),
+    tickets?.find((t) => t.id === ticketId),
   )
   return {
     conversation,
@@ -125,7 +125,8 @@ export async function consoleConversationView(
     messages,
     drafts,
     authors,
-    tickets,
+    tickets: tickets ?? [],
+    ticketsUnavailable: tickets === undefined,
     ...(ticketId ? { currentTicketId: ticketId } : {}),
     ...(until ? { waitingUntil: until } : {}),
   }

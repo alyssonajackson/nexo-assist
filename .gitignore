@@ -24,4 +24,4 @@ next-env.d.ts
 packages/agent/.scratch/
 test-results/
 playwright-report/
-.next-e2e/
+.next-*/

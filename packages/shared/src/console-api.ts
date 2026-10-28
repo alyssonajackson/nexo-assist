@@ -58,6 +58,8 @@ export const ConsoleConversationResponse = z.object({
   authors: z.record(z.string(), ConsoleAuthor),
   /** All of the employee's tickets, fetched with the analyst's token. */
   tickets: z.array(TicketView),
+  /** The ticket service did not answer (after retries): the side panel says so and the next poll tries again. */
+  ticketsUnavailable: z.boolean().default(false),
   /** The ticket tied to the handoff (transfer.ticketId or the latest related one). */
   currentTicketId: z.string().optional(),
   /** When the employee can expect a first answer ("até 12:05"), from the SLA of that ticket's priority. */
