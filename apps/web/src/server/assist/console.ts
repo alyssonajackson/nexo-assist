@@ -1,6 +1,7 @@
 import 'server-only'
 import {
   slaDueAt,
+  type ConsoleAuthor,
   type ConsoleConversationResponse,
   type ConsoleEmployee,
   type ConsoleFilter,
@@ -91,16 +92,7 @@ export async function consoleConversationView(
     db.users.findOne({ _id: conversation.employeeId }),
   ])
 
-  const authorIds = [
-    ...new Set([
-      ...messages.flatMap((m) => (m.role === 'analyst' && m.authorId ? [m.authorId] : [])),
-      ...(conversation.assignedAnalystId ? [conversation.assignedAnalystId] : []),
-    ]),
-  ]
-  const analysts = await db.users.find({ _id: { $in: authorIds } }).toArray()
-  const authors = Object.fromEntries(
-    analysts.map((u) => [u._id, { name: u.name, ...(u.team ? { team: u.team } : {}) }]),
-  )
+  const authors = await authorsOf(messages, conversation.assignedAnalystId)
 
   // The employee's tickets come from the tickets service with the analyst's own token. The service may
   // be down: the conversation still opens, the side panel just stays empty.
@@ -130,4 +122,22 @@ export async function consoleConversationView(
     ...(ticketId ? { currentTicketId: ticketId } : {}),
     ...(until ? { waitingUntil: until } : {}),
   }
+}
+
+/** Name and team of the analysts behind `analyst` messages (and the one holding the conversation). */
+export async function authorsOf(
+  messages: Message[],
+  assignedAnalystId?: string,
+): Promise<Record<string, ConsoleAuthor>> {
+  const ids = [
+    ...new Set([
+      ...messages.flatMap((m) => (m.role === 'analyst' && m.authorId ? [m.authorId] : [])),
+      ...(assignedAnalystId ? [assignedAnalystId] : []),
+    ]),
+  ]
+  if (!ids.length) return {}
+  const analysts = await (await assistDb()).users.find({ _id: { $in: ids } }).toArray()
+  return Object.fromEntries(
+    analysts.map((u) => [u._id, { name: u.name, ...(u.team ? { team: u.team } : {}) }]),
+  )
 }

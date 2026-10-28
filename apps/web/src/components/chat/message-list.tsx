@@ -21,7 +21,13 @@ export function MessageList() {
             return <AgentMessage key={m.id} message={m} ownDraftIds={own} activeDraftId={active} />
           }
           case 'analyst':
-            return <AnalystBubble key={m.id} text={m.text} />
+            return (
+              <AnalystBubble
+                key={m.id}
+                text={m.text}
+                author={m.authorId ? state.authors[m.authorId] : undefined}
+              />
+            )
           case 'system':
             return <SystemDivider key={m.id} text={m.text} />
         }

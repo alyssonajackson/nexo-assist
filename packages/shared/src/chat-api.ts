@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ConsoleAuthor } from './console-api'
 import { Conversation, Draft, Message } from './domain/conversation'
 import { ToolCall } from './domain/decision'
 import { TicketView } from './domain/ticket'
@@ -52,5 +53,7 @@ export const ConversationResponse = z.object({
   drafts: z.array(Draft),
   /** Tickets referenced by the cards, fetched with the employee's token (privacy applies). */
   tickets: z.array(TicketView),
+  /** Analysts who wrote in the conversation, by user id: name and team on their bubbles. */
+  authors: z.record(z.string(), ConsoleAuthor).optional(),
 })
 export type ConversationResponse = z.infer<typeof ConversationResponse>

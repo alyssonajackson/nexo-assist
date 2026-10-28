@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import type { ConsoleAuthor } from '@nexo/shared'
+import { Avatar } from '../shell/avatar'
 
 /** The employee's own message: dark, right-aligned. */
 export function EmployeeBubble({
@@ -36,14 +38,25 @@ export function AgentBubble({ children, live = false }: { children: ReactNode; l
   )
 }
 
-/** M5 shows analyst replies plainly; the console (M6) owns the full handoff experience. */
-export function AnalystBubble({ text }: { text: string }) {
+/** An analyst's reply in the employee's chat: avatar, name and team above a light green bubble. */
+export function AnalystBubble({ text, author }: { text: string; author: ConsoleAuthor | undefined }) {
+  const name = author?.name ?? 'Analista de TI'
   return (
-    <div className="flex flex-col items-start gap-1.5">
-      <span className="text-[12.5px] font-semibold text-ink">Analista de TI</span>
-      <p className="max-w-[600px] rounded-[4px_12px_12px_12px] bg-bubble-analyst px-4 py-3 text-[14.5px]/[22px] whitespace-pre-line text-ink">
-        {text}
-      </p>
+    <div className="flex items-start gap-2.5">
+      <Avatar name={name} size="sm" tone="green" />
+      <div className="flex flex-col items-start gap-1.5">
+        <span className="flex items-center gap-2 text-[12.5px]">
+          <span className="font-semibold text-ink">{name}</span>
+          {author?.team && (
+            <span className="rounded-sm bg-success-50 px-1.5 py-px text-[11.5px] font-medium text-success-700">
+              {author.team}
+            </span>
+          )}
+        </span>
+        <p className="max-w-[600px] rounded-[4px_12px_12px_12px] bg-bubble-analyst px-4 py-3 text-[14.5px]/[22px] whitespace-pre-line text-ink">
+          {text}
+        </p>
+      </div>
     </div>
   )
 }

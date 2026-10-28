@@ -1,6 +1,7 @@
 import 'server-only'
 import type { ConversationResponse, TicketView } from '@nexo/shared'
 import type { Session } from '../session'
+import { authorsOf } from './console'
 import { getEmployeeConversation } from './conversations'
 import { listDrafts } from './drafts'
 import { listMessages } from './messages'
@@ -28,5 +29,5 @@ export async function employeeConversationView(
       tickets = []
     }
   }
-  return { conversation, messages, drafts, tickets }
+  return { conversation, messages, drafts, tickets, authors: await authorsOf(messages) }
 }

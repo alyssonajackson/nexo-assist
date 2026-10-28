@@ -1,5 +1,6 @@
 import {
   MAX_EMPLOYEE_MESSAGES,
+  type ConsoleAuthor,
   type ChatStreamEvent,
   type Conversation,
   type ConversationResponse,
@@ -44,6 +45,8 @@ export type ChatState = {
   messages: Message[]
   drafts: Record<string, Draft>
   tickets: Record<string, TicketView>
+  /** Analysts by user id (name and team on their bubbles). */
+  authors: Record<string, ConsoleAuthor>
   turn: LiveTurn | null
   error: ChatError | null
 }
@@ -72,6 +75,7 @@ export function initialState(data: ConversationResponse | null): ChatState {
     messages: data?.messages ?? [],
     drafts: byId(data?.drafts ?? []),
     tickets: byId(data?.tickets ?? []),
+    authors: data?.authors ?? {},
     turn: null,
     error: null,
   }

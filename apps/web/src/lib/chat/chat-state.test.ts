@@ -106,6 +106,7 @@ describe('initialState', () => {
       messages: [],
       drafts: {},
       tickets: {},
+      authors: {},
       turn: null,
       error: null,
     })
