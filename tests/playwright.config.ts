@@ -33,6 +33,15 @@ export default defineConfig({
     reuseExistingServer: true,
     timeout: 180_000,
     // Own build dir: next dev refuses to start while another dev server uses the same one.
-    env: { LLM_MODEL: 'demo', NEXT_DIST_DIR: '.next-e2e' },
+    // The demo limits are raised: the suite logs in and chats faster than a person would.
+    env: {
+      LLM_MODEL: 'demo',
+      NEXT_DIST_DIR: '.next-e2e',
+      LLM_TURNS_PER_MINUTE: '1000',
+      LLM_TURNS_PER_DAY: '100000',
+      LLM_TURNS_PER_USER_PER_DAY: '100000',
+      CHAT_REQUESTS_PER_MINUTE: '1000',
+      LOGIN_ATTEMPTS_PER_IP: '1000',
+    },
   },
 })
