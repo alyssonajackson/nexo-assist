@@ -19,3 +19,4 @@ coverage/
 .beads/proxieddb/
 next-env.d.ts
 *.tsbuildinfo
+.gstack/
