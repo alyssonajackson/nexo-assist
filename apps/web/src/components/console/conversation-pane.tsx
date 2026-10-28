@@ -23,7 +23,7 @@ const PILL: Record<StatusTone, string> = {
 }
 
 const outlined =
-  'flex h-10 items-center gap-2 rounded-lg bg-surface px-3.5 text-[14px] font-medium text-ink shadow-button outline outline-1 -outline-offset-[.5px] outline-border-strong hover:bg-surface-muted disabled:opacity-50'
+  'flex h-10 whitespace-nowrap items-center gap-2 rounded-lg bg-surface px-3.5 text-[14px] font-medium text-ink shadow-button outline outline-1 -outline-offset-[.5px] outline-border-strong hover:bg-surface-muted disabled:opacity-50'
 
 type Props = {
   data: ConsoleConversationResponse | null
@@ -181,7 +181,7 @@ export function ConversationPane({
             <button
               onClick={onTakeOver}
               disabled={busy}
-              className="flex h-10 items-center gap-2 rounded-lg bg-primary-600 px-4 text-[14px] font-semibold text-white shadow-cta hover:bg-primary-700 disabled:opacity-50"
+              className="flex h-10 items-center gap-2 rounded-lg bg-primary-600 whitespace-nowrap px-4 text-[14px] font-semibold text-white shadow-cta hover:bg-primary-700 disabled:opacity-50"
             >
               <Headset className="size-4" aria-hidden="true" />
               Assumir atendimento
