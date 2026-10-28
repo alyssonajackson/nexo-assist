@@ -100,10 +100,10 @@ pnpm dev                                # web em :3000 e tickets em :4000, com h
 
 | Comando                                                         | Precisa                         | O que cobre                                                                                                      |
 | --------------------------------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `pnpm lint && pnpm format:check && pnpm typecheck && pnpm test` | nada                            | 260 testes unitários: SLA, prioridade, retry, regras do agent, cenários com modelo roteirizado, estado do chat   |
+| `pnpm lint && pnpm format:check && pnpm typecheck && pnpm test` | nada                            | 282 testes unitários: SLA, prioridade, retry, regras do agent, cenários com modelo roteirizado, estado do chat   |
 | `pnpm smoke`                                                    | stack no ar                     | init terminou, serviços saudáveis, tela de login renderiza                                                       |
-| `pnpm test:integration`                                         | stack no ar                     | 37 testes contra Mongo, Floci e o serviço de chamados reais (o de reinício só roda com `INTEGRATION_RESTARTS=1`) |
-| `pnpm test:e2e`                                                 | stack com `FLAKY_ENABLED=false` | 15 testes Playwright no navegador, com o modelo roteirizado                                                      |
+| `pnpm test:integration`                                         | stack no ar                     | 43 testes contra Mongo, Floci e o serviço de chamados reais (o de reinício só roda com `INTEGRATION_RESTARTS=1`) |
+| `pnpm test:e2e`                                                 | stack com `FLAKY_ENABLED=false` | 17 testes Playwright no navegador, com o modelo roteirizado                                                      |
 | `source scripts/env-from-keychain.sh && pnpm test:evals`        | chave do LLM                    | os 12 cenários com o modelo real (nunca roda na CI)                                                              |
 
 Os e2e sobem um `next dev` próprio na porta 3100 com o modelo roteirizado (não gastam cota de LLM) e
@@ -266,7 +266,7 @@ idempotentes, reabertura fora do prazo, o ciclo queda → fila → registro, a c
 assumindo a mesma conversa, o agent em silêncio durante o handoff e um teste que reinicia os containers
 e confere que conversas, chamados e estados sobreviveram.
 
-**4. Testes e2e (15, Playwright):** login e roteamento por papel, chat, painel de decisão, rascunho,
+**4. Testes e2e (17, Playwright):** login e roteamento por papel, chat, painel de decisão, rascunho,
 limite de mensagens e o handoff completo entre funcionário e console.
 
 **5. Verificação independente.** Depois do agent pronto, uma sessão separada, sem o contexto de quem
@@ -351,16 +351,20 @@ com analista não chama o LLM.
 
 ## Deploy
 
-**Ainda não publicado.** O deploy é o próximo marco (M8); o link entra aqui quando estiver no ar. O
-plano:
+**Ainda não publicado.** Está tudo preparado para publicar sem gastar (o link entra aqui quando estiver
+no ar); o roteiro completo, com as decisões, está em **[docs/deploy.md](docs/deploy.md)**. Em resumo:
 
-- **App:** os mesmos containers Docker do `compose.yaml` (web e tickets) num host Node, provavelmente o
-  Railway. O driver do MongoDB e os consumers SQS precisam de um processo Node de longa duração, então
-  Workers/serverless não servem.
-- **Banco:** MongoDB Atlas M0 (gratuito, 512 MB), com um usuário de banco de privilégio mínimo.
-- **AWS real:** user pool do Cognito e as três filas SQS com DLQs, criados por IaC. Um usuário IAM só com
-  permissão de Cognito e SQS deste projeto e um alerta de AWS Budget.
-- **Segredos:** só nos secrets da plataforma, nunca no git nem na imagem (já hoje o `.env` é ignorado
-  pelo git e pelo Docker, e `pnpm secrets:scan` roda o gitleaks).
-- **Contra abuso e custo:** rate limiting por usuário e um teto diário de chamadas ao LLM por usuário e
-  global; o endpoint de caos fica desligado.
+- **App:** os mesmos containers Docker do `compose.yaml` (web e tickets) no **Railway**. O driver do
+  MongoDB e os consumers SQS precisam de processos Node de longa duração, então Workers/serverless não
+  servem; o Render grátis dorme após 15 min e o Fly.io não tem mais cota grátis.
+- **Banco:** MongoDB Atlas M0 (gratuito, 512 MB), com um usuário só com `readWrite` em `tickets` e
+  `assist`.
+- **AWS real, por Terraform (`infra/`):** user pool do Cognito, as três filas SQS com DLQs, um usuário
+  IAM por serviço só com as filas e ações SQS que o código usa (o login do Cognito não precisa de IAM) e
+  um alerta de AWS Budget de US$ 5. As chaves de acesso ficam fora do state do Terraform.
+- **Segredos:** só nos secrets da plataforma, nunca no git nem na imagem. Com `APP_ENV=production` os
+  serviços recusam subir sem uma variável obrigatória ou com um endpoint de emulador; o endpoint de caos
+  fica desligado pelo código.
+- **Contra abuso e custo:** limites de turnos do agent por usuário por dia (40) e globais por minuto (4)
+  e por dia (150), dimensionados para o free tier do Gemini; rate limiting no login e no `/api/chat`.
+  Tudo configurável por env e com aviso claro no chat.
