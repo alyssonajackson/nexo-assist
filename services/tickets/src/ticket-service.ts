@@ -30,6 +30,14 @@ export class DomainError extends Error {
 const notFound = (id: string) => new DomainError(404, 'not_found', `Chamado ${id} não encontrado.`)
 const DAY = 86_400_000
 
+/**
+ * Minimum MongoDB textScore for a duplicate candidate. One shared word ("Windows", "acesso") scores
+ * about 0.5-3; the same problem told in other words scores 4.6-10 (measured on the seed data, see the
+ * duplicates test in tests/src/tickets-service.test.ts). Borderline cases still reach the agent, which
+ * can rule them out with a reason (notDuplicateOf).
+ */
+export const MIN_DUPLICATE_SCORE = 4
+
 export type WriteResult = { ticket: TicketView; replayed: boolean }
 
 /**
@@ -69,7 +77,8 @@ export class TicketService {
 
   /**
    * Candidates for "same problem": the requester's open tickets, plus tickets resolved within the
-   * reopen window. Code finds them; the agent decides whether one really is the same problem.
+   * reopen window, that share enough words with the text (MIN_DUPLICATE_SCORE). Code finds them; the
+   * agent decides whether one really is the same problem.
    */
   async duplicates(actor: Actor, text: string): Promise<DuplicateCandidate[]> {
     const reopenSince = new Date(this.now().getTime() - REOPEN_WINDOW_DAYS * DAY)
@@ -88,9 +97,10 @@ export class TicketService {
       .sort({ score: { $meta: 'textScore' } })
       .limit(3)
       .toArray()
-    return docs.map((d) => {
+    return docs.flatMap((d) => {
       const { score, ...doc } = d as TicketDoc & { score: number }
-      return { ticket: this.toView(doc), score: Math.round(score * 100) / 100 }
+      if (score < MIN_DUPLICATE_SCORE) return []
+      return [{ ticket: this.toView(doc), score: Math.round(score * 100) / 100 }]
     })
   }
 
