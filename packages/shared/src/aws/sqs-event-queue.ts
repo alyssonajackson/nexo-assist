@@ -15,7 +15,7 @@ const sleep = (ms: number, signal?: AbortSignal) =>
   })
 
 /**
- * EventQueue on SQS (or ElasticMQ). Messages are JSON validated with zod on both ends.
+ * EventQueue on SQS (or Floci). Messages are JSON validated with zod on both ends.
  * Long polling keeps the consumer cheap; failed messages are retried by SQS (visibility timeout)
  * and moved to the queue's DLQ by its redrive policy.
  */

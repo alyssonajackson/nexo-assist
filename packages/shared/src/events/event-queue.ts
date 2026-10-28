@@ -7,7 +7,7 @@ export type ConsumeOptions = {
 }
 
 /**
- * Message queue port. SqsEventQueue (@nexo/shared/aws) runs on SQS or ElasticMQ;
+ * Message queue port. SqsEventQueue (@nexo/shared/aws) runs on SQS or Floci;
  * InMemoryEventQueue is for unit tests.
  *
  * Delivery is at-least-once: handlers must be idempotent. A handler that throws leaves the

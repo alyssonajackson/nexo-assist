@@ -20,9 +20,9 @@ export type CognitoEnv = Record<string, string | undefined> & {
   COGNITO_USER_POOL_ID?: string
   COGNITO_CLIENT_ID?: string
   COGNITO_USER_POOL_NAME?: string
-  /** Local only: cognito-local signs `iss` with this domain (docker/cognito/config.json). */
+  /** Local only: Floci signs `iss` with its FLOCI_BASE_URL; set this to the same value. */
   COGNITO_ISSUER_DOMAIN?: string
-  /** Local only: where to reach cognito-local for the JWKS (differs inside the compose network). */
+  /** Local only: where to reach Floci for the JWKS (differs inside the compose network). */
   COGNITO_JWKS_DOMAIN?: string
 }
 
@@ -37,7 +37,7 @@ export async function findClientId(client: CognitoIdentityProviderClient, userPo
 }
 
 /**
- * On AWS the ids come from env (created by infra/). Locally, cognito-local generates ids on the
+ * On AWS the ids come from env (created by infra/). Locally, Floci generates ids on the
  * first start, so we look the pool and client up by name.
  */
 export async function resolveCognitoConfig(
