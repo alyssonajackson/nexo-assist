@@ -1,12 +1,8 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Browser, type Page } from '@playwright/test'
 import { login, send, USERS } from './helpers'
 
 /** Opens a second browser session (a different signed-in user) next to the default one. */
-async function openAs(
-  browser: import('@playwright/test').Browser,
-  email: string,
-  path: string,
-): Promise<Page> {
+async function openAs(browser: Browser, email: string, path: string): Promise<Page> {
   const context = await browser.newContext({
     baseURL: test.info().project.use.baseURL,
     viewport: { width: 1440, height: 900 },
