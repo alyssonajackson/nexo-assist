@@ -7,7 +7,7 @@
     "init:local": "tsx --env-file-if-exists=../.env src/init.ts",
     "seed:reset": "tsx --env-file-if-exists=../.env src/init.ts --reset",
     "typecheck": "tsc -p tsconfig.json",
-    "token": "tsx --env-file-if-exists=../.env src/dev-token.ts",
+    "dev:token": "tsx --env-file-if-exists=../.env src/dev-token.ts",
     "chat": "tsx --env-file-if-exists=../.env src/agent-chat.ts"
   },
   "dependencies": {

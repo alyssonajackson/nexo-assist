@@ -21,7 +21,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "secrets:scan": "./scripts/scan-secrets.sh",
-    "token": "pnpm --filter @nexo/scripts -s token",
+    "dev:token": "pnpm --filter @nexo/scripts --silent dev:token",
     "chat": "pnpm --filter @nexo/scripts -s chat"
   },
   "devDependencies": {
