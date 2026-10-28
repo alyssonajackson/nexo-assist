@@ -1,0 +1,19 @@
+{
+  "name": "@nexo/agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^4.0.107",
+    "@mastra/core": "^1.80.0",
+    "@nexo/shared": "workspace:*",
+    "ai": "^7.0.156",
+    "zod": "^4.6.7"
+  }
+}
