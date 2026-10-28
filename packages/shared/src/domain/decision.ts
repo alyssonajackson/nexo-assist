@@ -122,6 +122,27 @@ export const RuleName = z.enum([
 ])
 export type RuleName = z.infer<typeof RuleName>
 
+/** PT-BR names of the rules, for the decision panel ("regra aplicada pelo sistema"). */
+export const RULE_LABELS: Record<RuleName, string> = {
+  low_confidence: 'Confiança baixa',
+  gray_zone_confidence: 'Confiança intermediária',
+  out_of_scope: 'Fora do escopo de TI',
+  explicit_analyst_request: 'Pedido de analista',
+  critical_transfer: 'Caso crítico',
+  overdue_offer: 'Chamado com prazo vencido',
+  duplicate_check: 'Chamado duplicado',
+  reopen_window: 'Prazo de reabertura (7 dias)',
+  action_without_tool: 'Ação sem ferramenta',
+}
+
+/**
+ * Self-reported confidence is not reliable, so there are two thresholds (enforced in
+ * packages/agent/src/policy.ts, shown in the decision panel):
+ * - below 0.5 the agent hands the conversation to an analyst;
+ * - from 0.5 to 0.7 it never proposes a write, it asks a clarifying question first.
+ */
+export const CONFIDENCE = { transferBelow: 0.5, clarifyBelow: 0.7 } as const
+
 /** A rule enforced by code that changed or constrained what the model decided. */
 export const RuleOverride = z.object({
   rule: RuleName,

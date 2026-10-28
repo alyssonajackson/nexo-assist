@@ -1,4 +1,5 @@
 import {
+  CONFIDENCE,
   PRIORITY_LABELS,
   type Action,
   type Draft,
@@ -13,12 +14,9 @@ import type { TurnEffects } from './recorder'
  * Post-turn rules (Annex A), applied by code after the model answers. Pure: the caller executes the
  * result (transfer, cancel drafts). Every change is recorded as a RuleOverride, so the detail panel
  * shows what the model wanted and what code enforced.
- *
- * Self-reported confidence is not reliable, so there are two thresholds:
- * - below 0.5 the agent hands the conversation to an analyst;
- * - from 0.5 to 0.7 it never proposes a write, it asks a clarifying question first.
+ * The confidence thresholds (CONFIDENCE) live in @nexo/shared so the decision panel can show them.
  */
-export const CONFIDENCE = { transferBelow: 0.5, clarifyBelow: 0.7 } as const
+export { CONFIDENCE }
 
 export type TransferPlan = Omit<Transfer, 'at'>
 
