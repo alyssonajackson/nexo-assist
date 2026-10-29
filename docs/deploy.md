@@ -21,7 +21,7 @@ navegador ──HTTPS──▶ web (Next.js + agent + consumer assist-events)  �
         ┌──────────────┼───────────────────────────────┤
         ▼              ▼                               ▼
   MongoDB Atlas M0   SQS (3 filas + DLQs)          Cognito (user pool)      ── AWS da conta pessoal
-  dbs tickets/assist                                                        ── Gemini (Google AI Studio)
+  dbs tickets/assist                                                        ── LLM (Gemini ou Groq, projeto só da demo)
 ```
 
 Os mesmos containers do `compose.yaml`. O que muda entre local e online é só configuração: sem
@@ -148,28 +148,54 @@ O link é público, então o código limita o uso. Contadores em janelas fixas n
 atômica: valem entre reinícios e entre instâncias. Código em `packages/shared/src/rate-limit.ts` e
 `apps/web/src/server/limits.ts`.
 
-| Limite                                            | Variável                     | Padrão | Por quê                                                                                                                                          |
-| ------------------------------------------------- | ---------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Turnos do agent por usuário por dia               | `LLM_TURNS_PER_USER_PER_DAY` | 40     | Uma conversa tem no máximo 30 mensagens; 40 dá para testar com folga. Os avaliadores compartilham as contas do seed, então o limite é por conta. |
-| Turnos do agent no total por minuto               | `LLM_TURNS_PER_MINUTE`       | 4      | Free tier do Gemini: ~15 req/min, e um turno faz 2 a 4 chamadas ao modelo. 4 turnos ≈ 8-16 chamadas.                                             |
-| Turnos do agent no total por dia                  | `LLM_TURNS_PER_DAY`          | 150    | Free tier: 500 req/dia. 150 turnos × ~3 chamadas ≈ 450.                                                                                          |
-| Requisições ao `/api/chat` por usuário por minuto | `CHAT_REQUESTS_PER_MINUTE`   | 10     | Para scripts e cliques repetidos; uma pessoa digitando não chega perto.                                                                          |
-| Tentativas de login por IP em 15 min              | `LOGIN_ATTEMPTS_PER_IP`      | 20     | Força bruta a partir de um IP.                                                                                                                   |
-| Senhas erradas por e-mail em 15 min               | `LOGIN_FAILURES_PER_EMAIL`   | 5      | Força bruta numa conta. Só falhas contam: vários avaliadores entrando com a mesma conta não se bloqueiam.                                        |
+| Limite                                            | Variável                      | Padrão  | Por quê                                                                                                                                                                             |
+| ------------------------------------------------- | ----------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tokens do LLM por usuário por dia                 | `LLM_TOKENS_PER_USER_PER_DAY` | 40.000  | ~1/4 do dia global (~8 turnos, uma conversa típica): um avaliador não esgota a demo dos outros. Os avaliadores compartilham as contas do seed, então o limite é por conta.          |
+| Chamadas ao modelo no total por minuto            | `LLM_CALLS_PER_MINUTE`        | 12      | 80% de 15 req/min do Gemini Flash-Lite (a Groq dá 30). Um turno faz 2 a 5 chamadas.                                                                                                 |
+| Tokens no total por minuto                        | `LLM_TOKENS_PER_MINUTE`       | 6.000   | 75% de 8 mil tokens/min da Groq no gpt-oss-120b (o Gemini dá 250 mil). Com a Groq é o limite que mais aperta: um turno conta ~3-8 mil tokens (já sem o cache), ~1 turno por minuto. |
+| Chamadas ao modelo no total por dia               | `LLM_CALLS_PER_DAY`           | 400     | 80% de 500 req/dia do Gemini (a Groq dá 1.000).                                                                                                                                     |
+| Tokens no total por dia                           | `LLM_TOKENS_PER_DAY`          | 160.000 | 80% de 200 mil tokens/dia da Groq: ~30 turnos, ~4 conversas por dia na demo.                                                                                                        |
+| Requisições ao `/api/chat` por usuário por minuto | `CHAT_REQUESTS_PER_MINUTE`    | 10      | Para scripts e cliques repetidos; uma pessoa digitando não chega perto.                                                                                                             |
+| Tentativas de login por IP em 15 min              | `LOGIN_ATTEMPTS_PER_IP`       | 20      | Força bruta a partir de um IP.                                                                                                                                                      |
+| Senhas erradas por e-mail em 15 min               | `LOGIN_FAILURES_PER_EMAIL`    | 5       | Força bruta numa conta. Só falhas contam: vários avaliadores entrando com a mesma conta não se bloqueiam.                                                                           |
 
 Detalhes:
 
-- Os limites do LLM contam **turnos do agent**, verificados antes de gravar a mensagem. Uma mensagem
-  recusada continua no campo de texto. Mensagens durante um handoff não chamam o modelo e não contam.
-- A reserva é tudo ou nada: se o limite global recusa, o turno não é descontado do usuário.
+- Os limites do LLM contam o que o provedor conta: **chamadas ao modelo e tokens** (entrada + saída,
+  menos a entrada servida do cache de prompt, que a Groq não conta nos limites). Contar turnos do agent
+  não servia: um turno faz de 2 a 5 chamadas. Os padrões cabem nos dois free tiers com ~20% de folga: chamadas pelo Gemini
+  Flash-Lite (15 req/min, 500 req/dia) e tokens pela Groq `openai/gpt-oss-120b` (8 mil tokens/min, 200
+  mil/dia; console.groq.com/docs/rate-limits, conferidos nos headers `x-ratelimit-*` em 29/10/2026); com outro modelo, ajuste pelas variáveis.
+- O custo de um turno só é conhecido depois que ele roda. Então o turno começa se todos os contadores
+  estão abaixo do limite (verificado antes de gravar a mensagem; uma mensagem recusada continua no campo
+  de texto) e é contado ao terminar. Um turno pode passar do limite por um turno, e a folga de ~20% cobre
+  isso. Cada tentativa que falhou (num turno repetido ou que falhou) conta como uma chamada de ~3 mil
+  tokens, porque o provedor não relata o uso dela.
+- Mensagens durante um handoff não chamam o modelo e não contam.
 - As janelas diárias viram à meia-noite UTC (21h em Brasília); a mensagem para o funcionário diz isso.
 - Na interface, um aviso amarelo (não o vermelho de erro): "O Nexo Assist está com muita procura agora.
-  Tente de novo em 40 s." com o botão _Tentar novamente_, ou "Você usou as 40 respostas do Nexo Assist
-  de hoje…" sem botão. O chat continua funcionando (histórico, chamados, nova conversa).
+  Tente de novo em 40 s." com o botão _Tentar novamente_, ou "Você usou a cota de respostas do Nexo
+  Assist de hoje…" sem botão. O chat continua funcionando (histórico, chamados, nova conversa).
 - O IP vem do último item do `X-Forwarded-For`, o que o proxy da plataforma acrescenta (os anteriores
   podem ser forjados pelo cliente).
 - Os e2e sobem o `next dev` com os limites altos (`tests/playwright.config.ts`), porque fazem login e
   conversam mais rápido que uma pessoa.
+
+## Chaves do LLM: dev e demo separados
+
+Os limites grátis da Groq (e do Google AI Studio) valem por organização/projeto, não por chave. Um dia
+de desenvolvimento com evals gasta a cota diária inteira (a suíte de 12 cenários usa ~60 mil dos 200 mil
+tokens/dia do gpt-oss-120b), e foi assim que a cota do Gemini acabou em um dia. Então:
+
+- **Dev e evals:** uma organização/projeto Groq próprio, com a chave só no Keychain
+  (`nexo-assist/GROQ_API_KEY`, carregada por `scripts/env-from-keychain.sh`).
+- **Demo publicada:** outra organização Groq, com a chave só nos secrets do Railway. Os
+  limites do código (acima) são calculados para essa cota inteira ser da demo.
+- **Opcional, cobrança na demo:** no plano Developer da Groq os limites sobem (ex.: 250 mil tokens/min
+  e 1.000 req/min no gpt-oss-120b) e uma conversa custa ~US$ 0,01 (README, "Modelo e custo"). Se
+  ativar, só na organização da demo, com um limite de gastos baixo (ex.: US$ 5; conferir no console de
+  cobrança da Groq na hora), e suba as variáveis `LLM_*` na mesma proporção. Sem cobrança, o pior caso é
+  a demo recusar com o aviso de limite.
 
 ## Variáveis de ambiente em produção
 
@@ -182,25 +208,26 @@ git, nunca na imagem. As não secretas podem ficar como variáveis compartilhada
 
 ### web
 
-| Variável                                                                                                                | O que é                                                       | Secreta | Valor em produção                      |
-| ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ------- | -------------------------------------- |
-| `APP_ENV`                                                                                                               | Liga a verificação de produção                                | não     | `production`                           |
-| `MONGODB_URI`                                                                                                           | URI do Atlas                                                  | **sim** | `mongodb+srv://nexo-app:…`             |
-| `TICKETS_URL`                                                                                                           | Serviço de chamados pela rede privada                         | não     | `http://tickets.railway.internal:4000` |
-| `AWS_REGION`                                                                                                            | Região do Cognito e do SQS                                    | não     | `us-east-1`                            |
-| `AWS_ACCESS_KEY_ID`                                                                                                     | Chave do usuário IAM `nexo-assist-web`                        | **sim** | de `aws iam create-access-key`         |
-| `AWS_SECRET_ACCESS_KEY`                                                                                                 | Idem                                                          | **sim** | idem                                   |
-| `COGNITO_USER_POOL_ID`                                                                                                  | Saída `cognito_user_pool_id` do Terraform                     | não     | `us-east-1_…`                          |
-| `COGNITO_CLIENT_ID`                                                                                                     | Saída `cognito_client_id` do Terraform                        | não     | client sem secret, então não é segredo |
-| `LLM_MODEL`                                                                                                             | Modelo                                                        | não     | `google/gemini-3.5-flash-lite`         |
-| `GOOGLE_GENERATIVE_AI_API_KEY`                                                                                          | Chave do Google AI Studio (obrigatória com modelo `google/…`) | **sim** | uma chave só para o deploy             |
-| `ANTHROPIC_API_KEY`                                                                                                     | Só com `LLM_MODEL=anthropic/…`                                | **sim** | não usar na demo                       |
-| `LLM_TURNS_PER_USER_PER_DAY`, `LLM_TURNS_PER_MINUTE`, `LLM_TURNS_PER_DAY`                                               | Limites do LLM                                                | não     | padrões (40, 4, 150)                   |
-| `CHAT_REQUESTS_PER_MINUTE`, `LOGIN_ATTEMPTS_PER_IP`, `LOGIN_FAILURES_PER_EMAIL`                                         | Rate limiting                                                 | não     | padrões (10, 20, 5)                    |
-| `TICKETS_DB`, `ASSIST_DB`                                                                                               | Nomes dos bancos                                              | não     | omitir (padrão `tickets`, `assist`)    |
-| `SQS_*_QUEUE`                                                                                                           | Nomes das filas                                               | não     | omitir (iguais aos do Terraform)       |
-| `PORT`                                                                                                                  | Porta HTTP                                                    | não     | injetada pelo Railway                  |
-| **Não definir:** `COGNITO_ENDPOINT`, `SQS_ENDPOINT`, `COGNITO_ISSUER_DOMAIN`, `COGNITO_JWKS_DOMAIN`, `INSECURE_COOKIES` | Só locais                                                     | —       | a verificação recusa a subida          |
+| Variável                                                                                                                  | O que é                                         | Secreta | Valor em produção                      |
+| ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | ------- | -------------------------------------- |
+| `APP_ENV`                                                                                                                 | Liga a verificação de produção                  | não     | `production`                           |
+| `MONGODB_URI`                                                                                                             | URI do Atlas                                    | **sim** | `mongodb+srv://nexo-app:…`             |
+| `TICKETS_URL`                                                                                                             | Serviço de chamados pela rede privada           | não     | `http://tickets.railway.internal:4000` |
+| `AWS_REGION`                                                                                                              | Região do Cognito e do SQS                      | não     | `us-east-1`                            |
+| `AWS_ACCESS_KEY_ID`                                                                                                       | Chave do usuário IAM `nexo-assist-web`          | **sim** | de `aws iam create-access-key`         |
+| `AWS_SECRET_ACCESS_KEY`                                                                                                   | Idem                                            | **sim** | idem                                   |
+| `COGNITO_USER_POOL_ID`                                                                                                    | Saída `cognito_user_pool_id` do Terraform       | não     | `us-east-1_…`                          |
+| `COGNITO_CLIENT_ID`                                                                                                       | Saída `cognito_client_id` do Terraform          | não     | client sem secret, então não é segredo |
+| `LLM_MODEL`                                                                                                               | Modelo                                          | não     | a decidir (bead `nx-6mn`)              |
+| `GROQ_API_KEY`                                                                                                            | Chave da Groq (obrigatória com modelo `groq/…`) | **sim** | da organização da demo, não a de dev   |
+| `GOOGLE_GENERATIVE_AI_API_KEY`                                                                                            | Só com `LLM_MODEL=google/…`                     | **sim** | do projeto da demo, não o de dev       |
+| `ANTHROPIC_API_KEY`                                                                                                       | Só com `LLM_MODEL=anthropic/…`                  | **sim** | não usar na demo                       |
+| `LLM_TOKENS_PER_USER_PER_DAY`, `LLM_CALLS_PER_MINUTE`, `LLM_TOKENS_PER_MINUTE`, `LLM_CALLS_PER_DAY`, `LLM_TOKENS_PER_DAY` | Limites do LLM                                  | não     | padrões (40k, 12, 6k, 400, 160k)       |
+| `CHAT_REQUESTS_PER_MINUTE`, `LOGIN_ATTEMPTS_PER_IP`, `LOGIN_FAILURES_PER_EMAIL`                                           | Rate limiting                                   | não     | padrões (10, 20, 5)                    |
+| `TICKETS_DB`, `ASSIST_DB`                                                                                                 | Nomes dos bancos                                | não     | omitir (padrão `tickets`, `assist`)    |
+| `SQS_*_QUEUE`                                                                                                             | Nomes das filas                                 | não     | omitir (iguais aos do Terraform)       |
+| `PORT`                                                                                                                    | Porta HTTP                                      | não     | injetada pelo Railway                  |
+| **Não definir:** `COGNITO_ENDPOINT`, `SQS_ENDPOINT`, `COGNITO_ISSUER_DOMAIN`, `COGNITO_JWKS_DOMAIN`, `INSECURE_COOKIES`   | Só locais                                       | —       | a verificação recusa a subida          |
 
 Cookies: com `NODE_ENV=production` (já definido na imagem) e sem `INSECURE_COOKIES`, os cookies de
 sessão são `Secure`, `HttpOnly` e `SameSite=Lax`. O Railway serve HTTPS.
@@ -326,7 +353,8 @@ o mesmo comando com `--reset`.
 3. Serviço **web**: Dockerfile `docker/web.Dockerfile`, domínio público gerado pelo Railway,
    healthcheck `/api/health`, variáveis da [tabela do web](#web). `TICKETS_URL` usa o nome privado do
    tickets (`http://tickets.railway.internal:4000`).
-4. 👤 Colar os secrets (chaves IAM, URI do Atlas, chave do Gemini) como variáveis _sealed_.
+4. 👤 Colar os secrets (chaves IAM, URI do Atlas, a chave Groq **do projeto da demo**, veja
+   [Chaves do LLM](#chaves-do-llm-dev-e-demo-separados)) como variáveis _sealed_.
 5. Deploy. Nos logs, cada serviço deve subir sem `invalid production env`; o tickets loga
    `flaky=true, chaos=false`.
 
@@ -351,12 +379,12 @@ endpoint de caos não existe em produção (e o tickets nem tem endereço públi
 
 ## Rotação de chaves
 
-| Segredo         | Como rotacionar                                                                                                                                                                                                                                                                          |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Chaves IAM      | `aws iam create-access-key --user-name <usuário>` → atualizar no Railway → redeploy → `aws iam update-access-key --status Inactive --access-key-id <antiga>` → conferir → `aws iam delete-access-key`. Cada usuário pode ter duas chaves ao mesmo tempo, então não há janela fora do ar. |
-| Senha do Atlas  | _Database Access → Edit → Edit Password_ → atualizar `MONGODB_URI` nos dois serviços → redeploy.                                                                                                                                                                                         |
-| Chave do Gemini | Gerar outra no Google AI Studio → atualizar no Railway → apagar a antiga.                                                                                                                                                                                                                |
-| Senha do seed   | Rodar o init de novo com outro `SEED_PASSWORD` (ele reaplica a senha) e atualizar o README.                                                                                                                                                                                              |
+| Segredo        | Como rotacionar                                                                                                                                                                                                                                                                          |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chaves IAM     | `aws iam create-access-key --user-name <usuário>` → atualizar no Railway → redeploy → `aws iam update-access-key --status Inactive --access-key-id <antiga>` → conferir → `aws iam delete-access-key`. Cada usuário pode ter duas chaves ao mesmo tempo, então não há janela fora do ar. |
+| Senha do Atlas | _Database Access → Edit → Edit Password_ → atualizar `MONGODB_URI` nos dois serviços → redeploy.                                                                                                                                                                                         |
+| Chave da Groq  | Gerar outra no projeto da demo (console.groq.com/keys) → atualizar no Railway → apagar a antiga.                                                                                                                                                                                         |
+| Senha do seed  | Rodar o init de novo com outro `SEED_PASSWORD` (ele reaplica a senha) e atualizar o README.                                                                                                                                                                                              |
 
 Se algum segredo vazar: desative primeiro (chave IAM `Inactive`, senha do Atlas trocada), rotacione
 depois.

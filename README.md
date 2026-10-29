@@ -258,6 +258,11 @@ mesma suíte roda de dois jeitos:
   dia): 11 dos 12 cenários nem chegaram ao modelo. Para rodar as evals, comece com a cota do dia zerada,
   use `LLM_EVAL_DELAY_MS=5000` para respeitar o limite por minuto, ou troque o `LLM_MODEL`.
 
+**Groq (free tier), disponível via `LLM_MODEL`** (29/10): `groq/openai/gpt-oss-120b` fez **9/12** numa
+rodada completa. 2 das 3 falhas (o modelo "chama" uma tool `JSON` inexistente) foram corrigidas depois
+pelo retry só de resposta, em rodadas parciais; 11/12 é plausível, mas não foi provado.
+`groq/openai/gpt-oss-20b` fez **7/12**.
+
 **2. Regras em funções puras com testes unitários:** SLA (incluindo uma varredura de 336 horas), matriz
 de prioridade, retry, `policy.ts` (um teste por override).
 
@@ -365,6 +370,8 @@ no ar); o roteiro completo, com as decisões, está em **[docs/deploy.md](docs/d
 - **Segredos:** só nos secrets da plataforma, nunca no git nem na imagem. Com `APP_ENV=production` os
   serviços recusam subir sem uma variável obrigatória ou com um endpoint de emulador; o endpoint de caos
   fica desligado pelo código.
-- **Contra abuso e custo:** limites de turnos do agent por usuário por dia (40) e globais por minuto (4)
-  e por dia (150), dimensionados para o free tier do Gemini; rate limiting no login e no `/api/chat`.
+- **Contra abuso e custo:** limites do LLM que contam o que o provedor conta, chamadas ao modelo e
+  tokens: por usuário por dia (40 mil tokens) e globais por minuto (12 chamadas, 6 mil tokens) e por dia
+  (400 chamadas, 160 mil tokens), dentro dos free tiers do Gemini e da Groq; chaves separadas para dev e
+  para a demo; rate limiting no login e no `/api/chat`.
   Tudo configurável por env e com aviso claro no chat.
