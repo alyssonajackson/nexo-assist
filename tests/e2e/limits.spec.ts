@@ -17,7 +17,7 @@ async function withExhausted(collection: string, key: string, windowMs: number, 
     c.db('assist').collection<UsageDoc>(collection)
   await withMongo(async (c) => {
     for (const _id of ids)
-      await counters(c).updateOne({ _id }, { $set: { count: 1_000_000, expiresAt } }, { upsert: true })
+      await counters(c).updateOne({ _id }, { $set: { count: 1e15, expiresAt } }, { upsert: true })
   })
   try {
     await run()
@@ -37,9 +37,9 @@ test('too many failed logins for one e-mail show a clear message', async ({ page
 test("the user's daily LLM cap shows a notice and keeps the message in the composer", async ({ page }) => {
   const id = await withMongo((c) => userId(c, USERS.ana))
   await startFreshChat(page)
-  await withExhausted('llm_usage', `turns:user:${id}`, DAY_MS, async () => {
+  await withExhausted('llm_usage', `tokens:user:${id}`, DAY_MS, async () => {
     await send(page, 'Minha VPN não conecta')
-    await expect(page.getByText(/Você usou as \d+ respostas do Nexo Assist de hoje/)).toBeVisible()
+    await expect(page.getByText(/Você usou a cota de respostas do Nexo Assist de hoje/)).toBeVisible()
     await expect(page.getByRole('button', { name: 'Tentar novamente' })).toHaveCount(0)
     await expect(page.locator('#chat-input')).toBeEnabled()
     await expect(page.getByText('0/30 mensagens nesta sessão')).toBeVisible()
