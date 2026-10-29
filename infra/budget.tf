@@ -6,6 +6,13 @@ resource "aws_budgets_budget" "monthly" {
   limit_unit   = "USD"
   time_unit    = "MONTHLY"
 
+  # Only this project's cost, not the whole account's. Needs the `Project` tag activated as a cost
+  # allocation tag (Billing > Cost allocation tags); the tag shows up in billing within ~24 h.
+  cost_filter {
+    name   = "TagKeyValue"
+    values = [join("", ["user:Project$", var.project])]
+  }
+
   notification {
     comparison_operator        = "GREATER_THAN"
     threshold                  = 80
