@@ -23,7 +23,7 @@ COPY services/tickets services/tickets
 USER node
 EXPOSE 4000
 WORKDIR /repo/services/tickets
-# For plain Docker hosts and compose; Railway/Render/Fly use their own health check on GET /health.
+# For plain Docker hosts and compose; managed hosts may use their own health check on GET /health.
 HEALTHCHECK --interval=15s --timeout=3s --start-period=20s --retries=3 \
   CMD node -e "fetch('http://localhost:'+(process.env.TICKETS_PORT||process.env.PORT||4000)+'/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
 CMD ["node", "--import", "tsx", "src/main.ts"]
