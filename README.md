@@ -24,8 +24,9 @@ por quê.
 
 - **Docker** (com Compose). Não precisa de conta AWS: Cognito e SQS rodam no emulador
   [Floci](https://github.com/floci-io/floci).
-- **Uma chave do Google AI Studio** (gratuita) para o modelo padrão, Gemini 3.5 Flash-Lite. Sem chave,
-  dá para usar o modelo roteirizado (`LLM_MODEL=demo`, veja abaixo).
+- **Uma chave de LLM** (gratuita): Google AI Studio para o modelo padrão, Gemini 3.5 Flash-Lite, ou Groq
+  (`LLM_MODEL=groq/openai/gpt-oss-120b` no `.env`). Sem chave, dá para usar o modelo roteirizado
+  (`LLM_MODEL=demo`, veja abaixo). Trocar de modelo é só mudar `LLM_MODEL` no `.env` e reiniciar.
 - Para testes e o loop de desenvolvimento: **Node 24** e **pnpm** (`corepack enable`).
 
 ### Subir tudo
@@ -129,7 +130,7 @@ flowchart LR
     UI[Chat e console] --> API["rotas /api"] --> AG[packages/agent<br/>Mastra + policy.ts]
   end
   AG -- "tools via HTTP<br/>JWT do funcionário" --> T[services/tickets · Hono]
-  AG --> LLM[Gemini Flash-Lite]
+  AG --> LLM[LLM: Gemini ou Groq]
   API --> MA[(Mongo: assist)]
   T --> MT[(Mongo: tickets)]
   API -. login .-> C[Cognito]
@@ -290,7 +291,7 @@ escreveu o código, testou o agent contra o PRD. Achou 10 problemas, todos corri
 
 | Decisão                                                          | Por quê                                                                                                                                                                                                                                                                  | Custo                                                                                                                                                                                                     |
 | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Gemini 3.5 Flash-Lite, free tier**, em vez de Claude Haiku 4.5 | Custo zero para desenvolver e avaliar, e o modelo é bom o bastante com as regras no código. O provedor é configurável: `LLM_MODEL=anthropic/claude-haiku-4-5` funciona sem mudar código.                                                                                 | Limites do free tier (~15 req/min e 500 req/dia). Um turno faz 2 a 4 chamadas ao modelo; a suíte de evals consegue esgotar a cota do dia. O `gemini-3.5-flash` (sem Lite) tem só 5 req/min, pouco demais. |
+| **Gemini 3.5 Flash-Lite, free tier**, em vez de Claude Haiku 4.5 | Custo zero para desenvolver e avaliar, e o modelo é bom o bastante com as regras no código. O provedor é configurável no `.env`: `LLM_MODEL=groq/openai/gpt-oss-120b` (9/12 nas evals) ou `anthropic/claude-haiku-4-5` funcionam sem mudar código.                       | Limites do free tier (~15 req/min e 500 req/dia). Um turno faz 2 a 4 chamadas ao modelo; a suíte de evals consegue esgotar a cota do dia. O `gemini-3.5-flash` (sem Lite) tem só 5 req/min, pouco demais. |
 | **JSON no system prompt**, não o modo JSON nativo                | Com o modo nativo, o Flash-Lite deixava de chamar tools (6/12 cenários contra 10-12/12).                                                                                                                                                                                 | ~3 mil tokens de entrada por chamada só com prompt e schema.                                                                                                                                              |
 | **Polling (4 s)** em vez de SSE/WebSocket para handoff e console | Simples de explicar, roda em qualquer host Node, sem conexão longa. A resposta do agent já chega em streaming (NDJSON).                                                                                                                                                  | A mensagem do analista leva até 4 s para aparecer.                                                                                                                                                        |
 | **Floci** como emulador de Cognito e SQS                         | O LocalStack passou a exigir conta e token desde março de 2026, e quem avalia teria que se cadastrar. Comecei com cognito-local + ElasticMQ (dois containers, ajustes de compatibilidade) e troquei pelo Floci depois de um spike: um container, licença MIT, sem conta. | Emulador menos maduro que a AWS; por isso o código só muda endpoint e credenciais entre os ambientes.                                                                                                     |
@@ -344,10 +345,14 @@ entrada e ~4 mil de saída**.
 | ----------------------------------------- | ------------------------------------- | --------------------- | ------------------------- |
 | Gemini 3.5 Flash-Lite, free tier (padrão) | grátis                                | US$ 0                 | US$ 0, limitado pela cota |
 | Gemini 3.5 Flash-Lite, pago               | US$ 0,30 / US$ 2,50                   | ~US$ 0,03             | ~US$ 31                   |
+| Groq gpt-oss-120b, free tier              | grátis                                | US$ 0                 | US$ 0, limitado pela cota |
+| Groq gpt-oss-120b, pago                   | US$ 0,15 / US$ 0,60                   | ~US$ 0,01             | ~US$ 13                   |
 | Claude Haiku 4.5                          | US$ 1 / US$ 5                         | ~US$ 0,09 (sem cache) | ~US$ 90                   |
 
-Limites do free tier: ~15 requisições por minuto e 500 por dia no Flash-Lite. Para uso real, o
-plano pago é necessário, e o maior ganho de custo seria cachear o prompt e encurtar o schema.
+Limites do free tier: no Gemini Flash-Lite, ~15 requisições por minuto e 500 por dia; na Groq
+(gpt-oss-120b), 30 por minuto e 1.000 por dia, mas só 8 mil tokens por minuto e 200 mil por dia, o que
+dá ~1 turno por minuto. A parte fixa do prompt vem primeiro para o provedor cachear (na Groq, tokens em
+cache não contam no limite e custam metade). Para uso real, o plano pago é necessário.
 
 Para economizar modelo: o turno do **Confirmar** não chama o LLM (é decidido pelo código), e uma conversa
 com analista não chama o LLM.
@@ -356,12 +361,12 @@ com analista não chama o LLM.
 
 ## Deploy
 
-**Ainda não publicado.** Está tudo preparado para publicar sem gastar (o link entra aqui quando estiver
-no ar); o roteiro completo, com as decisões, está em **[docs/deploy.md](docs/deploy.md)**. Em resumo:
+**No ar em https://aly-nexo-assist.wip.rest** (usuários e senha de exemplo acima). O roteiro completo,
+com as decisões, está em **[docs/deploy.md](docs/deploy.md)**. Em resumo:
 
-- **App:** os mesmos containers Docker do `compose.yaml` (web e tickets) no **Railway**. O driver do
-  MongoDB e os consumers SQS precisam de processos Node de longa duração, então Workers/serverless não
-  servem; o Render grátis dorme após 15 min e o Fly.io não tem mais cota grátis.
+- **App:** web e tickets como dois processos Node de longa duração num **VPS próprio**, atrás de HTTPS;
+  só o web fica exposto. O driver do MongoDB e os consumers SQS precisam de processos que não dormem,
+  então Workers/serverless não servem.
 - **Banco:** MongoDB Atlas M0 (gratuito, 512 MB), com um usuário só com `readWrite` em `tickets` e
   `assist`.
 - **AWS real, por Terraform (`infra/`):** user pool do Cognito, as três filas SQS com DLQs, um usuário
