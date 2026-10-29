@@ -368,8 +368,8 @@ com as decisões, está em **[docs/deploy.md](docs/deploy.md)**. Em resumo:
 - **App:** web e tickets como dois processos Node de longa duração num **VPS próprio**, atrás de HTTPS;
   só o web fica exposto. O driver do MongoDB e os consumers SQS precisam de processos que não dormem,
   então Workers/serverless não servem.
-- **Banco:** MongoDB Atlas M0 (gratuito, 512 MB), com um usuário só com `readWrite` em `tickets` e
-  `assist`.
+- **Banco:** MongoDB Atlas M0 (gratuito, 512 MB), com um usuário por banco, cada um só com `readWrite`
+  no próprio banco (`tickets` ou `assist`).
 - **AWS real, por Terraform (`infra/`):** user pool do Cognito, as três filas SQS com DLQs, um usuário
   IAM por serviço só com as filas e ações SQS que o código usa (o login do Cognito não precisa de IAM) e
   um alerta de AWS Budget de US$ 5. As chaves de acesso ficam fora do state do Terraform.
