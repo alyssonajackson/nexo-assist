@@ -17,6 +17,7 @@ export const isProduction = (env: Env = process.env) => env.APP_ENV === 'product
 /** The API key the configured LLM provider needs (none for the scripted demo model). */
 export function llmKeyFor(model: string | undefined): string | undefined {
   if (model?.startsWith('anthropic/')) return 'ANTHROPIC_API_KEY'
+  if (model?.startsWith('groq/')) return 'GROQ_API_KEY'
   if (model === 'demo') return undefined
   return 'GOOGLE_GENERATIVE_AI_API_KEY'
 }

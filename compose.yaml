@@ -87,6 +87,7 @@ services:
       <<: *aws-local
       TICKETS_URL: http://tickets:4000
       # Secrets passed through from your shell (Keychain) or .env; never baked into the image.
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
       GOOGLE_GENERATIVE_AI_API_KEY: ${GOOGLE_GENERATIVE_AI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     depends_on:

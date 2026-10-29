@@ -2,7 +2,7 @@
 # Loads secrets from the macOS Keychain into the current shell, so they never live in a file.
 #
 # Store once (prompts for the value, nothing ends up in shell history):
-#   security add-generic-password -a "$USER" -s nexo-assist/GOOGLE_GENERATIVE_AI_API_KEY -w
+#   security add-generic-password -a "$USER" -s nexo-assist/GROQ_API_KEY -w
 #
 # Then, per shell:
 #   source scripts/env-from-keychain.sh
@@ -17,12 +17,12 @@ if [ -n "${BASH_SOURCE[0]:-}" ] && [ "${BASH_SOURCE[0]}" = "$0" ]; then
   exit 1
 fi
 
-# GOOGLE_GENERATIVE_AI_API_KEY is required by the default model; ANTHROPIC_API_KEY only if LLM_MODEL=anthropic/...
-for name in GOOGLE_GENERATIVE_AI_API_KEY ANTHROPIC_API_KEY; do
+# Each key is only needed when LLM_MODEL picks its provider (google/..., groq/..., anthropic/...).
+for name in GROQ_API_KEY GOOGLE_GENERATIVE_AI_API_KEY ANTHROPIC_API_KEY; do
   if value=$(security find-generic-password -a "$USER" -s "nexo-assist/$name" -w 2>/dev/null); then
     export "$name=$value"
     echo "loaded $name from Keychain"
-  elif [ "$name" = GOOGLE_GENERATIVE_AI_API_KEY ]; then
+  elif [ "$name" != ANTHROPIC_API_KEY ]; then
     echo "missing $name in Keychain (see the comment at the top of this script)" >&2
   fi
 done

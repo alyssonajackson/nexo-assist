@@ -15,6 +15,12 @@ describe('repairOutput', () => {
     })
   })
 
+  it('drops extracted fields outside their enum instead of failing the turn', () => {
+    const raw =
+      '{"intent":"ticket_lookup","extracted":{"category":"","priority":"urgente","ticketId":"INC-1"},"action":"list_tickets","confidence":0.9,"reason":"r","reply":"x"}'
+    expect(repairOutput(raw)?.extracted).toEqual({ ticketId: 'INC-1' })
+  })
+
   it('returns null when the result still does not match the schema', () => {
     expect(repairOutput('{intent:"nope"}')).toBeNull()
     expect(repairOutput('sem json')).toBeNull()

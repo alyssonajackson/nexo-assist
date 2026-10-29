@@ -27,6 +27,7 @@ describe('llmKeyFor', () => {
   it('maps the model to its provider key', () => {
     expect(llmKeyFor('google/gemini-3.5-flash-lite')).toBe('GOOGLE_GENERATIVE_AI_API_KEY')
     expect(llmKeyFor(undefined)).toBe('GOOGLE_GENERATIVE_AI_API_KEY')
+    expect(llmKeyFor('groq/openai/gpt-oss-120b')).toBe('GROQ_API_KEY')
     expect(llmKeyFor('anthropic/claude-haiku-4-5')).toBe('ANTHROPIC_API_KEY')
     expect(llmKeyFor('demo')).toBeUndefined()
   })

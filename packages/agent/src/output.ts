@@ -20,6 +20,13 @@ export const AgentOutput = z.object({
 })
 export type AgentOutput = z.infer<typeof AgentOutput>
 
+/**
+ * How the model must write AgentOutput, in place of Mastra's default (the full JSON schema dump, ~500
+ * tokens on every call). The enums are already listed in the system prompt. "Texto normal, sem chamar
+ * ferramenta": gpt-oss on Groq otherwise tries to call a tool named "JSON" for its final answer.
+ */
+export const OUTPUT_INSTRUCTIONS = `Formato da resposta final: quando terminar de usar as ferramentas, escreva uma mensagem de texto normal (sem chamar ferramenta) contendo só um objeto JSON, sem markdown, com os campos nesta ordem: intent, extracted (objeto com ticketId, title, description, type, category, affected, sameDayCommitment, hasWorkaround, priority, kbArticleIds; omita os que não souber), action, confidence, reason, missingFields (opcional), quickReplies (opcional), reply.`
+
 export function toModelDecision(out: AgentOutput): { decision: ModelDecision; reply: string } {
   const { reply, quickReplies, missingFields, ...rest } = out
   const replies = quickReplies
@@ -38,8 +45,10 @@ export function toModelDecision(out: AgentOutput): { decision: ModelDecision; re
 }
 
 /**
- * Small models sometimes write a JS object literal instead of JSON (unquoted keys, `undefined`).
- * Before giving up on the turn, try that one repair; the result is still validated by the schema.
+ * Small models sometimes write a JS object literal instead of JSON (unquoted keys, `undefined`), or an
+ * extracted field outside its enum (gpt-oss: `"category": ""`). Before giving up on the turn, try that
+ * one repair: quote the keys and drop the invalid extracted fields (all optional). The result is still
+ * validated by the schema, so intent, action and reply must be right.
  */
 export function repairOutput(raw: string): AgentOutput | null {
   const text = raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1)
@@ -47,11 +56,20 @@ export function repairOutput(raw: string): AgentOutput | null {
     .replace(/\bundefined\b/g, 'null')
     .replace(/([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:/g, '$1"$2":')
   try {
-    const parsed = AgentOutput.safeParse(dropNulls(JSON.parse(json)))
+    const parsed = AgentOutput.safeParse(dropInvalidExtracted(dropNulls(JSON.parse(json))))
     return parsed.success ? parsed.data : null
   } catch {
     return null
   }
+}
+
+function dropInvalidExtracted(v: unknown): unknown {
+  if (!v || typeof v !== 'object' || !('extracted' in v)) return v
+  const { extracted } = v
+  if (!extracted || typeof extracted !== 'object') return { ...v, extracted: {} }
+  const shape: Record<string, z.ZodType> = Extracted.shape
+  const valid = Object.entries(extracted).filter(([k, x]) => shape[k]?.safeParse(x).success)
+  return { ...v, extracted: Object.fromEntries(valid) }
 }
 
 function dropNulls(v: unknown): unknown {

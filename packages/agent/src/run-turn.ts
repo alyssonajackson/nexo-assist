@@ -3,7 +3,7 @@ import type { Decision, Message, MessagePart, ToolCall } from '@nexo/shared'
 import type { AssistAgent } from './agent'
 import { TURN_KEY, type AgentPorts, type AgentUser, type TurnContext } from './context'
 import { toModelMessages } from './history'
-import { AgentOutput, repairOutput, toModelDecision } from './output'
+import { AgentOutput, OUTPUT_INSTRUCTIONS, repairOutput, toModelDecision } from './output'
 import { applyPolicy, ticketsToShow, type TransferPlan } from './policy'
 import { TurnRecorder, type TurnEffects } from './recorder'
 
@@ -40,6 +40,7 @@ export type TurnResult = {
 
 const MAX_STEPS = 6
 const MAX_ATTEMPTS = 2
+const USAGE_TIMEOUT_MS = 5_000
 const FORCE_FIRST_TOOL = process.env.AGENT_FORCE_FIRST_TOOL !== '0'
 
 export const FAILURE_REPLY =
@@ -72,9 +73,12 @@ export async function runTurn(input: TurnInput): Promise<TurnResult> {
   let recorder = attempt.recorder
   let output: AgentOutput
   let usage: Decision['usage']
+  let answerOnly = false
   for (let n = 1; ; n++) {
     try {
-      ;({ output, usage } = await streamModel(input, attempt.requestContext, emit))
+      ;({ output, usage } = await streamModel(input, attempt.requestContext, emit, answerOnly))
+      // A retried turn also spent the failed attempt's calls; the LLM caps count it too.
+      if (usage && n > 1) usage = { ...usage, failedAttempts: n - 1 }
       break
     } catch (err) {
       // Provider hiccups (e.g. Gemini's MALFORMED_FUNCTION_CALL) are retried once, but only when the
@@ -82,13 +86,15 @@ export async function runTurn(input: TurnInput): Promise<TurnResult> {
       const fx = recorder.effects
       if (n < MAX_ATTEMPTS && !fx.drafts.length && !fx.transfer) {
         console.warn('agent: model turn failed, retrying once', err instanceof Error ? err.message : err)
+        // The model wanted to answer without a tool; let it (policy.ts still checks the answer).
+        answerOnly = isPhantomToolCall(err)
         attempt = prepare()
         recorder = attempt.recorder
         continue
       }
       console.error('agent: model turn failed', err)
       for (const d of fx.drafts) await input.ports.drafts.cancel(d.id)
-      return failedTurn(recorder, input.modelId, Date.now() - started, err)
+      return failedTurn(recorder, input.modelId, Date.now() - started, err, n)
     }
   }
 
@@ -146,20 +152,33 @@ async function streamModel(
   input: TurnInput,
   requestContext: RequestContext,
   emit: (e: TurnEvent) => void,
+  answerOnly: boolean,
 ): Promise<{ output: AgentOutput; usage: Decision['usage'] }> {
   const stream = await input.agent.stream(toModelMessages(input.history, input.text), {
     requestContext,
     maxSteps: MAX_STEPS,
     modelSettings: { temperature: 0.2 },
     // Gemini: a little thinking makes Flash-Lite call the tools it should (ignored by other providers).
-    providerOptions: { google: { thinkingConfig: { thinkingLevel: 'low' } } },
+    providerOptions: {
+      google: { thinkingConfig: { thinkingLevel: 'low' } },
+      groq: { reasoningEffort: 'low' },
+    },
     // JSON instructions go in the system prompt instead of the provider's native JSON mode: with Gemini
     // Flash-Lite, the native mode made the model skip tools (6/12 scenarios vs 8/12, see bead nx-dwf).
-    structuredOutput: { schema: AgentOutput, jsonPromptInjection: 'system' },
+    structuredOutput: {
+      schema: AgentOutput,
+      jsonPromptInjection: 'system',
+      instructions: OUTPUT_INSTRUCTIONS,
+    },
     // The first step must call a tool, so the model looks before it answers (it tended to answer from
-    // memory). Later steps are free, so it can finish with the JSON answer.
+    // memory). Later steps are free, so it can finish with the JSON answer. A retry after a phantom
+    // tool call gets no tools at all.
     prepareStep: ({ stepNumber }) =>
-      stepNumber === 0 && FORCE_FIRST_TOOL ? { toolChoice: 'required' } : undefined,
+      answerOnly
+        ? { toolChoice: 'none', activeTools: [] }
+        : stepNumber === 0 && FORCE_FIRST_TOOL
+          ? { toolChoice: 'required' }
+          : undefined,
     ...(input.abortSignal ? { abortSignal: input.abortSignal } : {}),
   })
   let sentDecision = false
@@ -180,9 +199,19 @@ async function streamModel(
       replyLength = reply.length
     }
   }
-  const total = await stream.totalUsage.catch(() => undefined)
-  const usage = total
-    ? { inputTokens: total.inputTokens ?? 0, outputTokens: total.outputTokens ?? 0 }
+  // Summed per step: one model call each. (Mastra's totalUsage dropped the input tokens on a cache hit.)
+  // Bounded: usage is bookkeeping and must never hold the turn (an eval run once hung with no I/O).
+  const steps = await withTimeout(stream.steps, USAGE_TIMEOUT_MS, [])
+  const sum = (pick: (u: (typeof steps)[number]['usage']) => number | undefined) =>
+    steps.reduce((n, s) => n + (pick(s.usage) ?? 0), 0)
+  const cached = sum((u) => u.cachedInputTokens)
+  const usage = steps.length
+    ? {
+        inputTokens: sum((u) => u.inputTokens),
+        outputTokens: sum((u) => u.outputTokens),
+        ...(cached ? { cachedInputTokens: cached } : {}),
+        modelCalls: steps.length,
+      }
     : undefined
   try {
     return { output: AgentOutput.parse(await stream.object), usage }
@@ -214,6 +243,26 @@ async function proposeReopenByRule(
   recorder.effects.drafts.push(draft)
 }
 
+/** `promise`, or `fallback` if it rejects or has not settled after `ms`. */
+export function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallback), ms)
+  })
+  return Promise.race([promise.catch(() => fallback), timeout]).finally(() => clearTimeout(timer))
+}
+
+/**
+ * gpt-oss on Groq, when it wants to answer without a tool, sometimes "calls" a tool named JSON with its
+ * answer, or refuses the forced first tool. Groq rejects both and returns no text to repair.
+ */
+export function isPhantomToolCall(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : ''
+  return /attempted to call tool '[^']*' which was not in request\.tools|Tool choice is required, but model did not call a tool/.test(
+    message,
+  )
+}
+
 /** The model's raw text, which Mastra attaches to a structured-output validation error. */
 function rawOutput(err: unknown): string {
   if (typeof err !== 'object' || err === null || !('details' in err)) return ''
@@ -242,7 +291,13 @@ function buildParts(
   return parts
 }
 
-function failedTurn(recorder: TurnRecorder, modelId: string, latencyMs: number, err: unknown): TurnResult {
+function failedTurn(
+  recorder: TurnRecorder,
+  modelId: string,
+  latencyMs: number,
+  err: unknown,
+  attempts: number,
+): TurnResult {
   const why = err instanceof Error ? err.message.slice(0, 200) : 'erro desconhecido'
   const transfer = recorder.effects.transfer
   return {
@@ -260,6 +315,7 @@ function failedTurn(recorder: TurnRecorder, modelId: string, latencyMs: number, 
       source: 'code',
       model: modelId,
       latencyMs,
+      usage: { inputTokens: 0, outputTokens: 0, modelCalls: 0, failedAttempts: attempts },
     },
   }
 }

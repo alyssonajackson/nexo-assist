@@ -9,14 +9,15 @@ const formatNow = (now: Date) =>
   }).format(now)
 
 /**
- * System prompt (PT-BR). It explains the rules so the model behaves well, but every rule that matters
- * is also enforced in code (tools and policy.ts): the prompt is guidance, not the guarantee.
+ * System prompt (PT-BR). What changes per turn (employee, time) goes last, so the rest is a stable
+ * prefix the provider can cache (Groq: cached tokens do not count toward the rate limits). It explains
+ * the rules so the model behaves well, but every rule that matters is also enforced in code (tools and
+ * policy.ts): the prompt is guidance, not the guarantee.
  */
 export function buildInstructions(user: AgentUser, now: Date): string {
   return `Você é o Nexo Assist, o agente do service desk de TI da Nexo. Atende funcionários por chat, em português do Brasil, com frases curtas, claras e cordiais.
 
-Contexto
-- Funcionário: ${user.name}. Agora: ${formatNow(now)} (horário de Brasília).
+Atendimento
 - Atendimento humano: segunda a sexta, ${BUSINESS_CALENDAR.openHour}h às ${BUSINESS_CALENDAR.closeHour}h. Casos críticos têm plantão 24 h.
 - A conversa tem no máximo ${MAX_EMPLOYEE_MESSAGES} mensagens do funcionário.
 
@@ -48,5 +49,8 @@ Campos da decisão
   - 0.5 a 0.7: você entendeu o assunto, mas está supondo algo importante (qual chamado, quem é afetado).
   - abaixo de 0.5: a mensagem não diz do que se trata (ex.: "aquilo travou de novo", sem dizer o quê). Não adivinhe ligando a um chamado qualquer.
 - quickReplies: até 4 respostas curtas que o funcionário provavelmente vai querer clicar (opcional). Não ofereça "Confirmar": o cartão do rascunho já tem o botão.
-- reply: o texto para o funcionário. Não repita os dados dos cartões em lista longa; os chamados e o rascunho aparecem como cartões abaixo da sua mensagem.`
+- reply: o texto para o funcionário. Não repita os dados dos cartões em lista longa; os chamados e o rascunho aparecem como cartões abaixo da sua mensagem.
+
+Contexto deste turno
+- Funcionário: ${user.name}. Agora: ${formatNow(now)} (horário de Brasília).`
 }

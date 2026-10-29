@@ -39,6 +39,8 @@ describe(`decision scenarios (${model})`, () => {
       ms: r.result.decision.latencyMs,
       tokensIn: r.result.decision.usage?.inputTokens,
       tokensOut: r.result.decision.usage?.outputTokens,
+      cached: r.result.decision.usage?.cachedInputTokens,
+      calls: r.result.decision.usage?.modelCalls,
       failures:
         r.failures.join('; ') + (r.result.decision.source === 'code' ? ` [${r.result.decision.reason}]` : ''),
     }))

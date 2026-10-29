@@ -184,7 +184,17 @@ export const Decision = ModelDecision.extend({
   source: z.enum(['model', 'code']),
   model: z.string().optional(),
   latencyMs: z.number().int().nonnegative().optional(),
-  /** Tokens of the whole turn (every model step), for the cost estimate. */
-  usage: z.object({ inputTokens: z.number().int(), outputTokens: z.number().int() }).optional(),
+  /** Tokens and model calls of the whole turn (every model step), for the cost estimate and the LLM caps. */
+  usage: z
+    .object({
+      inputTokens: z.number().int(),
+      outputTokens: z.number().int(),
+      /** Input tokens the provider served from its prompt cache (Groq: they do not count toward its limits). */
+      cachedInputTokens: z.number().int().optional(),
+      modelCalls: z.number().int().optional(),
+      /** Attempts that failed before the answer (or all of them, on a failed turn): usage not reported. */
+      failedAttempts: z.number().int().optional(),
+    })
+    .optional(),
 })
 export type Decision = z.infer<typeof Decision>
