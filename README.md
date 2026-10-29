@@ -361,7 +361,8 @@ com analista não chama o LLM.
 
 ## Deploy
 
-**No ar em https://aly-nexo-assist.wip.rest** (usuários e senha de exemplo acima). O roteiro completo,
+**No ar em https://aly-nexo-assist.wip.rest** (usuários e senha de exemplo acima), com o modelo
+`groq/openai/gpt-oss-120b` no free tier da Groq (~1 turno por minuto; o chat avisa quando o limite é atingido). O roteiro completo,
 com as decisões, está em **[docs/deploy.md](docs/deploy.md)**. Em resumo:
 
 - **App:** web e tickets como dois processos Node de longa duração num **VPS próprio**, atrás de HTTPS;
