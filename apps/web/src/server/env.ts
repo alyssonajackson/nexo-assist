@@ -9,13 +9,17 @@ export const env = {
   ticketsUrl: e.TICKETS_URL ?? 'http://localhost:4000',
   secureCookies: e.NODE_ENV === 'production' && e.INSECURE_COOKIES !== 'true',
   /**
-   * Caps that keep a public demo inside the Gemini free tier (~15 req/min, 500 req/day; a turn makes
-   * 2-4 model calls). Counted per agent turn, in MongoDB, so they hold across restarts and instances.
+   * Caps that keep a public demo inside the LLM provider's free tier, counted like the provider counts:
+   * model calls and tokens (cached input excluded). Defaults fit both free tiers with ~20% headroom:
+   * calls from Gemini Flash-Lite (15 req/min, 500 req/day), tokens from Groq gpt-oss-120b (8K
+   * tokens/min, 200K tokens/day). In MongoDB, so they hold across restarts and instances.
    */
   llm: {
-    turnsPerUserPerDay: intFromEnv(e, 'LLM_TURNS_PER_USER_PER_DAY', 40),
-    turnsPerMinute: intFromEnv(e, 'LLM_TURNS_PER_MINUTE', 4),
-    turnsPerDay: intFromEnv(e, 'LLM_TURNS_PER_DAY', 150),
+    tokensPerUserPerDay: intFromEnv(e, 'LLM_TOKENS_PER_USER_PER_DAY', 40_000),
+    callsPerMinute: intFromEnv(e, 'LLM_CALLS_PER_MINUTE', 12),
+    tokensPerMinute: intFromEnv(e, 'LLM_TOKENS_PER_MINUTE', 6_000),
+    callsPerDay: intFromEnv(e, 'LLM_CALLS_PER_DAY', 400),
+    tokensPerDay: intFromEnv(e, 'LLM_TOKENS_PER_DAY', 160_000),
   },
   rateLimit: {
     chatPerUserPerMinute: intFromEnv(e, 'CHAT_REQUESTS_PER_MINUTE', 10),

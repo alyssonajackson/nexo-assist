@@ -4,12 +4,14 @@ import { InMemoryCounterStore } from '@nexo/shared'
 vi.mock('server-only', () => ({}))
 vi.mock('./db', () => ({ assistDb: vi.fn() }))
 
-const { clientIp, createLimits } = await import('./limits')
+const { clientIp, createLimits, FAILED_ATTEMPT_USE, llmUseOf } = await import('./limits')
 
 const config = {
-  turnsPerUserPerDay: 3,
-  turnsPerMinute: 2,
-  turnsPerDay: 5,
+  tokensPerUserPerDay: 10_000,
+  callsPerMinute: 6,
+  tokensPerMinute: 8_000,
+  callsPerDay: 20,
+  tokensPerDay: 25_000,
   chatPerUserPerMinute: 2,
   loginPerIpPer15Min: 3,
   loginFailuresPerEmailPer15Min: 2,
@@ -19,48 +21,80 @@ const setup = () =>
 const at = (iso: string) => new Date(iso)
 const minute = (m: number) => at(`2026-10-28T10:${String(m).padStart(2, '0')}:00Z`)
 
-describe('agent turn caps', () => {
-  it('refuses for a minute when the global per-minute cap is hit, and can be retried', async () => {
+describe('LLM caps (model calls and tokens)', () => {
+  const turn = { modelCalls: 3, tokens: 4_000 }
+
+  it('refuses for the rest of the minute once the per-minute tokens are used, and can be retried', async () => {
     const limits = setup()
-    expect(await limits.reserveAgentTurn('a', minute(0))).toBeNull()
-    expect(await limits.reserveAgentTurn('b', minute(0))).toBeNull()
-    expect(await limits.reserveAgentTurn('c', minute(0))).toMatchObject({ code: 'llm_busy', retry: true })
-    expect(await limits.reserveAgentTurn('c', minute(1))).toBeNull()
+    expect(await limits.checkLlm('a', minute(0))).toBeNull()
+    await limits.recordLlm('a', turn, minute(0))
+    // Under the cap: a second turn starts and may overshoot by one turn (it is recorded afterwards).
+    expect(await limits.checkLlm('b', minute(0))).toBeNull()
+    await limits.recordLlm('b', turn, minute(0))
+    expect(await limits.checkLlm('c', minute(0))).toMatchObject({ code: 'llm_busy', retry: true })
+    expect(await limits.checkLlm('c', minute(1))).toBeNull()
   })
 
-  it("refuses for the rest of the day once the user's daily turns are used", async () => {
+  it('counts model calls, not turns', async () => {
     const limits = setup()
-    for (const m of [0, 1, 2]) expect(await limits.reserveAgentTurn('a', minute(m))).toBeNull()
-    const refusal = await limits.reserveAgentTurn('a', minute(3))
+    await limits.recordLlm('a', { modelCalls: 6, tokens: 100 }, minute(0))
+    expect(await limits.checkLlm('b', minute(0))).toMatchObject({ code: 'llm_busy' })
+  })
+
+  it('refuses the user for the rest of the day once their daily tokens are used; others are served', async () => {
+    const limits = setup()
+    for (const m of [0, 1, 2]) await limits.recordLlm('a', turn, minute(m))
+    const refusal = await limits.checkLlm('a', minute(3))
     expect(refusal).toMatchObject({ code: 'llm_user_daily_cap', retry: false })
-    expect(refusal?.message).toContain('3 respostas')
-    // Other users are still served.
-    expect(await limits.reserveAgentTurn('b', minute(3))).toBeNull()
+    expect(refusal?.message).toContain('limite desta demonstração')
+    expect(await limits.checkLlm('b', minute(3))).toBeNull()
   })
 
-  it('refuses everyone once the global daily cap is hit', async () => {
-    const limits = setup()
+  it('refuses everyone once the global daily tokens or calls are used', async () => {
+    const byTokens = setup()
     for (const [user, m] of [
       ['a', 0],
       ['b', 1],
       ['c', 2],
       ['d', 3],
       ['e', 4],
+      ['f', 5],
+      ['g', 6],
     ] as const)
-      expect(await limits.reserveAgentTurn(user, minute(m))).toBeNull()
-    expect(await limits.reserveAgentTurn('f', minute(5))).toMatchObject({
-      code: 'llm_daily_cap',
-      retry: false,
+      await byTokens.recordLlm(user, turn, minute(m))
+    expect(await byTokens.checkLlm('h', minute(7))).toMatchObject({ code: 'llm_daily_cap', retry: false })
+
+    const byCalls = setup()
+    for (const m of [0, 1, 2, 3]) await byCalls.recordLlm(`u${m}`, { modelCalls: 5, tokens: 10 }, minute(m))
+    expect(await byCalls.checkLlm('h', minute(5))).toMatchObject({ code: 'llm_daily_cap' })
+  })
+
+  it('a check alone counts nothing', async () => {
+    const limits = setup()
+    for (let i = 0; i < 50; i++) expect(await limits.checkLlm('a', minute(0))).toBeNull()
+  })
+})
+
+describe('llmUseOf', () => {
+  it('counts input and output tokens, minus the cached input', () => {
+    expect(
+      llmUseOf({ inputTokens: 9_000, outputTokens: 500, cachedInputTokens: 5_000, modelCalls: 3 }),
+    ).toEqual({ modelCalls: 3, tokens: 4_500 })
+  })
+
+  it('adds the failed attempts of a retried turn', () => {
+    expect(llmUseOf({ inputTokens: 5_000, outputTokens: 200, modelCalls: 2, failedAttempts: 1 })).toEqual({
+      modelCalls: 3,
+      tokens: 5_200 + FAILED_ATTEMPT_USE.tokens,
     })
   })
 
-  it('a released turn is not counted', async () => {
-    const limits = setup()
-    for (const m of [0, 1, 2]) {
-      expect(await limits.reserveAgentTurn('a', minute(m))).toBeNull()
-      await limits.releaseAgentTurn('a', minute(m))
-    }
-    expect(await limits.reserveAgentTurn('a', minute(3))).toBeNull()
+  it('counts a failed turn by its attempts, and a turn without usage as one typical call', () => {
+    expect(llmUseOf({ inputTokens: 0, outputTokens: 0, modelCalls: 0, failedAttempts: 2 })).toEqual({
+      modelCalls: 2,
+      tokens: 2 * FAILED_ATTEMPT_USE.tokens,
+    })
+    expect(llmUseOf(undefined)).toEqual(FAILED_ATTEMPT_USE)
   })
 })
 

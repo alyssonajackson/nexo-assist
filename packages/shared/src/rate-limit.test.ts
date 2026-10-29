@@ -7,6 +7,7 @@ import {
   InMemoryCounterStore,
   MINUTE_MS,
   peek,
+  peekAll,
   release,
   type Limit,
 } from './rate-limit'
@@ -65,5 +66,19 @@ describe('peek and hit', () => {
     expect(await peek(store, limit, now)).toEqual({ ok: true })
     await hit(store, limit, now)
     expect(await peek(store, limit, now)).toMatchObject({ ok: false, retryAfterS: 60 })
+  })
+})
+
+describe('peekAll and counted hits', () => {
+  it('returns the first limit already used up, counting `by` per hit', async () => {
+    const store = new InMemoryCounterStore()
+    const calls = perMinute('calls:global', 10)
+    const tokens = perMinute('tokens:global', 8000)
+    const now = at('2026-10-28T10:42:00Z')
+    await hit(store, calls, now, 3)
+    await hit(store, tokens, now, 7999)
+    expect(await peekAll(store, [calls, tokens], now)).toEqual({ ok: true })
+    await hit(store, tokens, now, 1)
+    expect(await peekAll(store, [calls, tokens], now)).toMatchObject({ ok: false, limit: tokens })
   })
 })

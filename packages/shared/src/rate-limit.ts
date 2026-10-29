@@ -1,13 +1,13 @@
 /**
  * Fixed-window counters for rate limits and the LLM caps. One counter per key and window
- * ("turns:user:u1" for the minute that started at 10:42:00). Fixed windows are the simplest
+ * ("tokens:user:u1" for the day that started at 00:00 UTC). Fixed windows are the simplest
  * thing that works: at a window edge a client can get up to 2x the limit, which is fine here.
  *
  * The store only needs an atomic increment, so it can be MongoDB in the app and a Map in tests.
  */
 
 export type Limit = {
-  /** What is counted and for whom, e.g. `turns:user:<id>` or `login:ip:<ip>`. */
+  /** What is counted and for whom, e.g. `calls:global` or `login:ip:<ip>`. */
   key: string
   /** Maximum count per window. */
   max: number
@@ -71,9 +71,18 @@ export async function peek(store: CounterStore, limit: Limit, now = new Date()):
   return count >= limit.max ? blocked(limit, now) : { ok: true }
 }
 
-/** Counts one use without checking (the check is a later `peek`). */
-export async function hit(store: CounterStore, limit: Limit, now = new Date()): Promise<void> {
-  await store.add(counterId(limit.key, limit.windowMs, now), 1, windowEnd(now, limit.windowMs))
+/** `peek` for several limits: the first one already used up, if any. */
+export async function peekAll(store: CounterStore, limits: Limit[], now = new Date()): Promise<LimitResult> {
+  for (const limit of limits) {
+    const result = await peek(store, limit, now)
+    if (!result.ok) return result
+  }
+  return { ok: true }
+}
+
+/** Counts `by` uses without checking (the check is a later `peek`). */
+export async function hit(store: CounterStore, limit: Limit, now = new Date(), by = 1): Promise<void> {
+  await store.add(counterId(limit.key, limit.windowMs, now), by, windowEnd(now, limit.windowMs))
 }
 
 /** For unit tests and local tools. Not shared across processes. */

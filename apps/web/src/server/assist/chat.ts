@@ -7,7 +7,7 @@ import {
   type Conversation,
   type Transfer,
 } from '@nexo/shared'
-import { limits, type RefusalCode } from '../limits'
+import { limits, llmUseOf, type RefusalCode } from '../limits'
 import type { Session } from '../session'
 import {
   addRelatedTickets,
@@ -60,16 +60,13 @@ export async function sendMessage(session: Session, req: ChatRequest, emit: Emit
     throw new ChatError('closed', 'Esta conversa foi encerrada. Comece uma nova conversa.')
 
   // LLM caps, checked before anything is stored: a refused message stays in the composer.
-  // Messages during a handoff never reach the model, so they are not counted.
-  const reserved = conv.state === 'agent'
-  if (reserved) {
-    const refusal = await limits().reserveAgentTurn(userId)
+  // Messages during a handoff never reach the model, so they are not checked or counted.
+  if (conv.state === 'agent') {
+    const refusal = await limits().checkLlm(userId)
     if (refusal) throw new ChatError(refusal.code, refusal.message)
   }
 
   const counted = await countEmployeeMessage(conv.id, userId)
-  // Refused by the message limit, or handed off meanwhile: the reserved turn was not used.
-  if (reserved && counted?.state !== 'agent') await limits().releaseAgentTurn(userId)
   if (!counted) {
     throw new ChatError(
       'message_limit',
@@ -117,6 +114,7 @@ export async function sendMessage(session: Session, req: ChatRequest, emit: Emit
     ports,
     onEvent: (e) => emit(e),
   })
+  await limits().recordLlm(userId, llmUseOf(result.decision.usage))
 
   const agentMessage = await appendMessage({
     conversationId: conv.id,

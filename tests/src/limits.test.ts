@@ -84,7 +84,7 @@ afterAll(async () => {
 
 describe('LLM caps', () => {
   it("refuses the turn when the user's daily cap is used, before storing anything", async () => {
-    await exhaust('usage', `turns:user:${ana.userId}`, DAY_MS)
+    await exhaust('usage', `tokens:user:${ana.userId}`, DAY_MS)
     const conversationId = await insertConversation('agent')
 
     const events = await postNdjson('/api/chat', ana.cookie, { conversationId, text: 'Minha VPN caiu' })
@@ -94,8 +94,8 @@ describe('LLM caps', () => {
     expect((await conversations().findOne({ _id: conversationId }))?.employeeMessageCount).toBe(0)
   })
 
-  it('refuses everyone when the global per-minute cap is hit, with a retry hint', async () => {
-    await exhaust('usage', 'turns:global', MINUTE_MS)
+  it('refuses everyone when the global per-minute tokens are used, with a retry hint', async () => {
+    await exhaust('usage', 'tokens:global', MINUTE_MS)
     const conversationId = await insertConversation('agent')
 
     const events = await postNdjson('/api/chat', ana.cookie, { conversationId, text: 'Minha VPN caiu' })
@@ -103,8 +103,20 @@ describe('LLM caps', () => {
     expect(errorOf(events)?.message).toMatch(/Tente de novo em \d+ s/)
   })
 
+  it('counts the model calls of a turn after it runs', async () => {
+    const conversationId = await insertConversation('agent')
+    const calls = async () =>
+      (await llmUsage().findOne({ _id: counterId('calls:global', DAY_MS, new Date()) }))?.count ?? 0
+    const before = await calls()
+
+    const events = await postNdjson('/api/chat', ana.cookie, { conversationId, text: 'Oi' })
+    expect(events.some((e) => e.type === 'message')).toBe(true)
+    // At least one call: a turn that fails (e.g. no LLM key in CI) still counts as one.
+    expect(await calls()).toBeGreaterThan(before)
+  })
+
   it('still delivers messages to an analyst: a handoff never calls the LLM', async () => {
-    await exhaust('usage', 'turns:global', DAY_MS)
+    await exhaust('usage', 'calls:global', DAY_MS)
     const conversationId = await insertConversation('waiting_analyst')
 
     const events = await postNdjson('/api/chat', ana.cookie, { conversationId, text: 'Ainda aguardo' })
